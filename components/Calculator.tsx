@@ -76,6 +76,9 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
 
     // 2. יצירת מנוי Realtime להאזנה לשינויים בטבלת calculator_data
     console.log('🔌 מתחבר ל-Supabase Realtime...');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/5f148aac-62cd-4068-86fe-977686300d59',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Calculator.tsx:79',message:'Before creating Realtime channel',data:{hasSupabaseClient:!!supabaseClient,hasChannel:!!supabaseClient?.channel},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     const channel = supabaseClient
       .channel('calculator-updates', {
         config: {
@@ -119,6 +122,9 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
       )
       .subscribe((status: string) => {
         console.log('📡 סטטוס Realtime subscription:', status);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5f148aac-62cd-4068-86fe-977686300d59',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Calculator.tsx:120',message:'Realtime subscription status',data:{status:status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         if (status === 'SUBSCRIBED') {
           console.log('✅ מחובר בהצלחה ל-Supabase Realtime!');
         } else if (status === 'CHANNEL_ERROR') {

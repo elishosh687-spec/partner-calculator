@@ -26,11 +26,56 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
   // Result State
   const [result, setResult] = useState<TransactionResult | null>(null);
 
-  // Supabase Realtime Subscription
+  // טעינת נתונים קיימים מ-Supabase + Realtime Subscription
   useEffect(() => {
-    console.log('🔌 מתחבר ל-Supabase Realtime...');
+    console.log('🔌 מתחבר ל-Supabase...');
     
-    // יצירת מנוי Realtime להאזנה לשינויים בטבלת calculator_data
+    // 1. טעינת נתונים קיימים מהמסד נתונים
+    const loadExistingData = async () => {
+      try {
+        console.log('📥 טוען נתונים קיימים מ-Supabase...');
+        const { data, error } = await supabaseClient
+          .from('calculator_data')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            console.log('ℹ️ אין נתונים קיימים במסד הנתונים');
+          } else {
+            console.error('❌ שגיאה בטעינת נתונים:', error);
+          }
+        } else if (data && data.result) {
+          console.log('✅ טעינתי נתונים קיימים:', data);
+          try {
+            const existingResult = typeof data.result === 'string' 
+              ? JSON.parse(data.result) 
+              : data.result;
+            
+            console.log('✅ מעדכן עם נתונים קיימים:', existingResult);
+            setResult(existingResult);
+            
+            // עדכן גם את השדות האחרים
+            if (existingResult.customerName) setCustomerName(existingResult.customerName);
+            if (existingResult.date) setDate(existingResult.date);
+            if (existingResult.totalRevenue) setTotalRevenue(existingResult.totalRevenue.toString());
+            if (existingResult.eliPercentage) setEliPercent(existingResult.eliPercentage);
+            if (existingResult.shimonPercentage) setShimonPercent(existingResult.shimonPercentage);
+          } catch (parseError) {
+            console.error('❌ שגיאה בפענוח נתונים:', parseError);
+          }
+        }
+      } catch (error) {
+        console.error('❌ שגיאה בטעינת נתונים:', error);
+      }
+    };
+
+    // טען נתונים קיימים
+    loadExistingData();
+
+    // 2. יצירת מנוי Realtime להאזנה לשינויים בטבלת calculator_data
+    console.log('🔌 מתחבר ל-Supabase Realtime...');
     const channel = supabaseClient
       .channel('calculator-updates', {
         config: {

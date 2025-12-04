@@ -1,6 +1,6 @@
 // Supabase Configuration
-const SUPABASE_URL = 'https://cqecoufqidbaxpfotsmg.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_tCAZXcRwjcGmcJ1_eNqMyQ_BcZAUbop';
+const SUPABASE_URL = 'https://fdzrjqcbitwkpfayjmed.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Xasx1l43rgzy_JvhWvvFLQ_RKhrxVrz';
 
 // יצירת מופע Supabase Client
 declare const window: Window & {

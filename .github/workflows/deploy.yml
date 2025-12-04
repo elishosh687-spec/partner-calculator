@@ -43,7 +43,9 @@ jobs:
           npm list --depth=0
       
       - name: Build
-        run: npm run build
+        run: |
+          rm -rf node_modules/.vite
+          npm run build
         env:
           NODE_ENV: production
       

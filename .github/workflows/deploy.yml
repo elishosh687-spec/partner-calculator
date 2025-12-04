@@ -26,13 +26,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install --legacy-peer-deps
+          npm list --depth=0
       
       - name: Build
         run: npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: Check dist folder
+        run: |
+          ls -la dist/ || echo "dist folder not found"
+          ls -la dist/assets/ || echo "assets folder not found"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

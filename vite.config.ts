@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+        'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development')
       },
       resolve: {
         alias: {
@@ -23,6 +24,8 @@ export default defineConfig(({ mode }) => {
       build: {
         outDir: 'dist',
         assetsDir: 'assets',
+        emptyOutDir: true,
+        sourcemap: false,
       }
     };
 });

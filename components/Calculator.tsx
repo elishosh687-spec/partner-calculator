@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User } from 'lucide-react';
 import { Expense, TransactionResult } from '../types';
+import supabaseClient from '../supabase';
 
 interface CalculatorProps {
   onSave: (transaction: TransactionResult) => void;
@@ -24,6 +25,41 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
 
   // Result State
   const [result, setResult] = useState<TransactionResult | null>(null);
+
+  // Supabase Realtime Subscription
+  useEffect(() => {
+    // יצירת מנוי Realtime להאזנה לשינויים בטבלת calculator_data
+    const channel = supabaseClient
+      .channel('calculator-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // האזנה לכל סוגי השינויים (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'calculator_data',
+          filter: 'id=eq.1'
+        },
+        (payload: any) => {
+          // כאשר מתקבל שינוי מהשותף, עדכן את התצוגה
+          if (payload.new && payload.new.result) {
+            try {
+              const newResult = typeof payload.new.result === 'string' 
+                ? JSON.parse(payload.new.result) 
+                : payload.new.result;
+              setResult(newResult);
+            } catch (error) {
+              console.error('שגיאה בעדכון התוצאה:', error);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // ניקוי המנוי כאשר הקומפוננטה נסגרת
+    return () => {
+      supabaseClient.removeChannel(channel);
+    };
+  }, []);
 
   // Calculate percentages dynamically
   const handleEliChange = (val: string) => {
@@ -59,7 +95,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
   // Calculation Logic
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     const revenue = parseFloat(totalRevenue) || 0;
     const net = revenue - totalExpenses;
     
@@ -76,6 +112,30 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
     };
 
     setResult(res);
+
+    // שמירה ל-Supabase - עדכון השורה עם ID=1
+    try {
+      const { error } = await supabaseClient
+        .from('calculator_data')
+        .update({ result: res })
+        .eq('id', 1);
+
+      if (error) {
+        console.error('שגיאה בשמירה ל-Supabase:', error);
+        // אם השורה לא קיימת, ננסה ליצור אותה
+        if (error.code === 'PGRST116' || error.message.includes('No rows')) {
+          const { error: insertError } = await supabaseClient
+            .from('calculator_data')
+            .insert({ id: 1, result: res });
+          
+          if (insertError) {
+            console.error('שגיאה ביצירת שורה חדשה:', insertError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('שגיאה בשמירה ל-Supabase:', error);
+    }
   };
 
   const handleReset = () => {

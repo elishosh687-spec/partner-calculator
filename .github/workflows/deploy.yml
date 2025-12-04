@@ -39,8 +39,19 @@ jobs:
       
       - name: Check dist folder
         run: |
+          echo "=== Checking dist folder ==="
           ls -la dist/ || echo "dist folder not found"
+          echo "=== Checking dist/assets ==="
           ls -la dist/assets/ || echo "assets folder not found"
+          echo "=== Checking index.html ==="
+          if [ -f dist/index.html ]; then
+            echo "index.html found:"
+            head -20 dist/index.html
+            echo "..."
+            tail -10 dist/index.html
+          else
+            echo "index.html NOT FOUND in dist!"
+          fi
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

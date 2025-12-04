@@ -1,0 +1,9 @@
+[33mcommit f517105a331c678dbe3d67b4fdb1aec0fc0b714a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: elishosh687-spec <elishosh687@gmail.com>
+Date:   Thu Dec 4 14:25:38 2025 +0200
+
+    1
+
+components/Calculator.tsx
+package-lock.json
+supabase.ts

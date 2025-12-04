@@ -55,6 +55,24 @@ jobs:
           else
             echo "index.html NOT FOUND in dist!"
           fi
+          echo "=== Checking built JavaScript for Supabase URL ==="
+          if [ -f dist/assets/*.js ]; then
+            JS_FILE=$(ls dist/assets/*.js | head -1)
+            echo "Checking file: $JS_FILE"
+            if grep -q "fdzrjqcbitwkpfayjmed.supabase.co" "$JS_FILE"; then
+              echo "✅ Found NEW Supabase URL in built JS"
+            else
+              echo "❌ NEW Supabase URL NOT found in built JS"
+            fi
+            if grep -q "cqecoufqidbaxpfotsmg.supabase.co" "$JS_FILE"; then
+              echo "❌ Found OLD Supabase URL in built JS - BUILD IS USING OLD CODE!"
+              exit 1
+            else
+              echo "✅ OLD Supabase URL not found in built JS"
+            fi
+          else
+            echo "No JS files found in dist/assets/"
+          fi
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

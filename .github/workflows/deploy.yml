@@ -30,6 +30,13 @@ jobs:
       - name: Clear npm cache
         run: npm cache clean --force
       
+      - name: Remove old dist folder
+        run: |
+          if [ -d "dist" ]; then
+            rm -rf dist
+            echo "Removed old dist folder"
+          fi
+      
       - name: Install dependencies
         run: |
           npm install --legacy-peer-deps

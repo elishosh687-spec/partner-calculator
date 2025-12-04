@@ -28,3 +28,4 @@ GitHub Pages לא יכול להריץ TypeScript ישירות. צריך לבנו
 - ה-workflow יופעל אוטומטית בכל push ל-main
 - אם יש שגיאות, בדוק ב-Actions → ה-workflow האחרון
 
+

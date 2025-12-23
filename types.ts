@@ -5,6 +5,9 @@ export interface Expense {
 }
 
 export interface TransactionResult {
+  id?: string; // Firebase document ID
+  partnerId: string; // 🆕 ID של השותף שיצר את העסקה
+  partnerName?: string; // 🆕 שם השותף (לתצוגה)
   customerName: string;
   date: string;
   totalRevenue: number;
@@ -14,6 +17,14 @@ export interface TransactionResult {
   shimonShare: number;
   eliPercentage: number;
   shimonPercentage: number;
+}
+
+export interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  role: 'partner' | 'boss';
+  createdAt: Date;
 }
 
 export type Tab = 'calculator' | 'history';

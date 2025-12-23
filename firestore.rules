@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // פונקציית עזר - בדיקה אם המשתמש מחובר
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // פונקציית עזר - בדיקה אם המשתמש הוא בוס
+    function isBoss() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'boss';
+    }
+    
+    // פונקציית עזר - בדיקה אם המשתמש הוא בעל המסמך
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // חוקים לאוסף המשתמשים
+    match /users/{userId} {
+      // קריאה: המשתמש עצמו או בוס
+      allow read: if isOwner(userId) || isBoss();
+      
+      // יצירה: רק במהלך הרשמה (המשתמש יוצר את המסמך שלו)
+      allow create: if isOwner(userId) && 
+                       request.resource.data.keys().hasAll(['name', 'email', 'role', 'createdAt']);
+      
+      // עדכון: רק המשתמש עצמו (לא יכול לשנות תפקיד)
+      allow update: if isOwner(userId) && 
+                       request.resource.data.role == resource.data.role;
+      
+      // מחיקה: אסורה
+      allow delete: if false;
+    }
+    
+    // חוקים לאוסף העסקאות
+    match /transactions/{transactionId} {
+      // קריאה: בוס רואה הכל, שותף רואה רק את שלו
+      allow read: if isSignedIn() && 
+                     (isBoss() || resource.data.partnerId == request.auth.uid);
+      
+      // יצירה: רק משתמש מחובר, וה-partnerId חייב להיות שלו
+      allow create: if isSignedIn() && 
+                       request.resource.data.partnerId == request.auth.uid &&
+                       request.resource.data.keys().hasAll([
+                         'partnerId', 
+                         'partnerName',
+                         'customerName', 
+                         'date', 
+                         'totalRevenue', 
+                         'totalExpenses',
+                         'netProfit',
+                         'eliShare',
+                         'shimonShare',
+                         'eliPercentage',
+                         'shimonPercentage',
+                         'createdAt'
+                       ]);
+      
+      // עדכון: רק בעל העסקה (לא יכול לשנות partnerId)
+      allow update: if isSignedIn() && 
+                       resource.data.partnerId == request.auth.uid &&
+                       request.resource.data.partnerId == resource.data.partnerId;
+      
+      // מחיקה: בעל העסקה או בוס
+      allow delete: if isSignedIn() && 
+                       (resource.data.partnerId == request.auth.uid || isBoss());
+    }
+  }
+}
+

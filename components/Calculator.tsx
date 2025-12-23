@@ -1,13 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User, Users } from 'lucide-react';
 import { Expense, TransactionResult } from '../types';
-import supabaseClient from '../supabase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface CalculatorProps {
   onSave: (transaction: TransactionResult) => void;
+  currentUserId: string;
 }
 
-const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
+interface Partner {
+  id: string;
+  name: string;
+}
+
+const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
+  // Partners list
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
+  const [loadingPartners, setLoadingPartners] = useState(true);
+
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [totalRevenue, setTotalRevenue] = useState<string>('');
@@ -26,111 +38,34 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
   // Result State
   const [result, setResult] = useState<TransactionResult | null>(null);
 
-  // טעינת נתונים קיימים מ-Supabase + Realtime Subscription
+  // Load partners from Firestore
   useEffect(() => {
-    console.log('🔌 מתחבר ל-Supabase...');
-    
-    // 1. טעינת נתונים קיימים מהמסד נתונים
-    const loadExistingData = async () => {
+    const loadPartners = async () => {
       try {
-        console.log('📥 טוען נתונים קיימים מ-Supabase...');
-        const { data, error } = await supabaseClient
-          .from('calculator_data')
-          .select('*')
-          .eq('id', 1)
-          .single();
-
-        if (error) {
-          if (error.code === 'PGRST116') {
-            console.log('ℹ️ אין נתונים קיימים במסד הנתונים');
-          } else {
-            console.error('❌ שגיאה בטעינת נתונים:', error);
-          }
-        } else if (data && data.result) {
-          console.log('✅ טעינתי נתונים קיימים:', data);
-          try {
-            const existingResult = typeof data.result === 'string' 
-              ? JSON.parse(data.result) 
-              : data.result;
-            
-            console.log('✅ מעדכן עם נתונים קיימים:', existingResult);
-            setResult(existingResult);
-            
-            // עדכן גם את השדות האחרים
-            if (existingResult.customerName) setCustomerName(existingResult.customerName);
-            if (existingResult.date) setDate(existingResult.date);
-            if (existingResult.totalRevenue) setTotalRevenue(existingResult.totalRevenue.toString());
-            if (existingResult.eliPercentage) setEliPercent(existingResult.eliPercentage);
-            if (existingResult.shimonPercentage) setShimonPercent(existingResult.shimonPercentage);
-          } catch (parseError) {
-            console.error('❌ שגיאה בפענוח נתונים:', parseError);
-          }
+        const q = query(collection(db, 'users'), where('role', '==', 'partner'));
+        const querySnapshot = await getDocs(q);
+        const partnersList: Partner[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          partnersList.push({
+            id: doc.id,
+            name: data.name,
+          });
+        });
+        
+        setPartners(partnersList);
+        if (partnersList.length > 0) {
+          setSelectedPartnerId(partnersList[0].id);
         }
       } catch (error) {
-        console.error('❌ שגיאה בטעינת נתונים:', error);
+        console.error('❌ שגיאה בטעינת שותפים:', error);
+      } finally {
+        setLoadingPartners(false);
       }
     };
 
-    // טען נתונים קיימים
-    loadExistingData();
-
-    // 2. יצירת מנוי Realtime להאזנה לשינויים בטבלת calculator_data
-    console.log('🔌 מתחבר ל-Supabase Realtime...');
-    const channel = supabaseClient
-      .channel('calculator-updates', {
-        config: {
-          broadcast: { self: true }
-        }
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // האזנה לכל סוגי השינויים (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'calculator_data',
-          filter: 'id=eq.1'
-        },
-        (payload: any) => {
-          console.log('📨 קיבלתי עדכון מ-Supabase:', payload);
-          
-          // כאשר מתקבל שינוי מהשותף, עדכן את התצוגה
-          if (payload.new && payload.new.result) {
-            try {
-              const newResult = typeof payload.new.result === 'string' 
-                ? JSON.parse(payload.new.result) 
-                : payload.new.result;
-              
-              console.log('✅ מעדכן תוצאה חדשה:', newResult);
-              setResult(newResult);
-              
-              // עדכן גם את השדות האחרים אם הם קיימים
-              if (newResult.customerName) setCustomerName(newResult.customerName);
-              if (newResult.date) setDate(newResult.date);
-              if (newResult.totalRevenue) setTotalRevenue(newResult.totalRevenue.toString());
-              if (newResult.eliPercentage) setEliPercent(newResult.eliPercentage);
-              if (newResult.shimonPercentage) setShimonPercent(newResult.shimonPercentage);
-            } catch (error) {
-              console.error('❌ שגיאה בעדכון התוצאה:', error);
-            }
-          } else if (payload.old) {
-            console.log('🗑️ שורה נמחקה:', payload.old);
-          }
-        }
-      )
-      .subscribe((status: string) => {
-        console.log('📡 סטטוס Realtime subscription:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ מחובר בהצלחה ל-Supabase Realtime!');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ שגיאה בחיבור ל-Supabase Realtime');
-        }
-      });
-
-    // ניקוי המנוי כאשר הקומפוננטה נסגרת
-    return () => {
-      console.log('🔌 מנתק חיבור ל-Supabase Realtime...');
-      supabaseClient.removeChannel(channel);
-    };
+    loadPartners();
   }, []);
 
   // Calculate percentages dynamically
@@ -167,11 +102,19 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
   // Calculation Logic
-  const handleCalculate = async () => {
+  const handleCalculate = () => {
+    if (!selectedPartnerId) {
+      alert('אנא בחר שותף');
+      return;
+    }
+
     const revenue = parseFloat(totalRevenue) || 0;
     const net = revenue - totalExpenses;
+    const selectedPartner = partners.find(p => p.id === selectedPartnerId);
     
     const res: TransactionResult = {
+      partnerId: selectedPartnerId,
+      partnerName: selectedPartner?.name || 'שותף',
       customerName: customerName || 'לקוח מזדמן',
       date,
       totalRevenue: revenue,
@@ -184,39 +127,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
     };
 
     setResult(res);
-
-    // שמירה ל-Supabase - עדכון השורה עם ID=1
-    try {
-      console.log('💾 שומר ל-Supabase...', res);
-      
-      const { data, error } = await supabaseClient
-        .from('calculator_data')
-        .update({ result: res })
-        .eq('id', 1)
-        .select();
-
-      if (error) {
-        console.error('❌ שגיאה בשמירה ל-Supabase:', error);
-        // אם השורה לא קיימת, ננסה ליצור אותה
-        if (error.code === 'PGRST116' || error.message.includes('No rows') || error.message.includes('not found')) {
-          console.log('📝 יוצר שורה חדשה...');
-          const { data: insertData, error: insertError } = await supabaseClient
-            .from('calculator_data')
-            .insert({ id: 1, result: res })
-            .select();
-          
-          if (insertError) {
-            console.error('❌ שגיאה ביצירת שורה חדשה:', insertError);
-          } else {
-            console.log('✅ שורה חדשה נוצרה בהצלחה:', insertData);
-          }
-        }
-      } else {
-        console.log('✅ נשמר בהצלחה ל-Supabase:', data);
-      }
-    } catch (error) {
-      console.error('❌ שגיאה בשמירה ל-Supabase:', error);
-    }
+    console.log('✅ חישוב הושלם:', res);
   };
 
   const handleReset = () => {
@@ -227,6 +138,9 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
     setResult(null);
     setEliPercent(20);
     setShimonPercent(80);
+    if (partners.length > 0) {
+      setSelectedPartnerId(partners[0].id);
+    }
   };
 
   const handleSave = () => {
@@ -238,15 +152,57 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
 
   // Format currency
   const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   };
 
+  if (loadingPartners) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto"></div>
+        <p className="text-slate-400 mt-4">טוען שותפים...</p>
+      </div>
+    );
+  }
+
+  if (partners.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-14 h-14 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+          <Users className="text-slate-600" size={28} />
+        </div>
+        <p className="text-base text-slate-300 font-medium">אין שותפים במערכת</p>
+        <p className="text-xs text-slate-500 mt-2">צריך להוסיף שותפים כדי ליצור עסקאות</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-6 md:space-y-8">
+      {/* Partner Selection */}
+      <div className="bg-gradient-to-r from-purple-500/10 to-cyan-500/10 p-4 sm:p-5 rounded-2xl border border-white/10">
+        <label className="block text-slate-300 text-sm font-bold mb-3 flex items-center gap-2">
+          <Users size={18} />
+          בחר שותף לעסקה
+        </label>
+        <select
+          value={selectedPartnerId}
+          onChange={(e) => setSelectedPartnerId(e.target.value)}
+          className="w-full input-premium rounded-xl py-3 px-4 text-white text-lg font-medium outline-none appearance-none cursor-pointer"
+          style={{ backgroundImage: 'none' }}
+        >
+          {partners.map((partner) => (
+            <option key={partner.id} value={partner.id} className="bg-slate-900">
+              {partner.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-slate-500 text-xs mt-2">העסקה תשוייך ל-{partners.find(p => p.id === selectedPartnerId)?.name}</p>
+      </div>
+
       {/* Top Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
         <div className="relative group">
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 pr-1">שם לקוח</label>
+          <label className="block text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 pr-1">שם לקוח</label>
           <div className="relative">
             <User className="absolute right-3 top-3.5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
             <input
@@ -260,7 +216,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
         </div>
 
         <div className="relative group">
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 pr-1">תאריך עסקה</label>
+          <label className="block text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 pr-1">תאריך עסקה</label>
           <div className="relative">
             <Calendar className="absolute right-3 top-3.5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
             <input
@@ -273,14 +229,14 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
         </div>
 
         <div className="md:col-span-2 relative group">
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 pr-1">סך הכנסה</label>
+          <label className="block text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 pr-1">סך הכנסה</label>
           <div className="relative">
              <Wallet className="absolute right-3 top-3.5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
             <input
               type="number"
               value={totalRevenue}
               onChange={(e) => setTotalRevenue(e.target.value)}
-              className="w-full input-premium rounded-xl py-3 pr-10 pl-4 text-white text-lg font-medium placeholder-slate-600 outline-none"
+              className="w-full input-premium rounded-xl py-2.5 sm:py-3 pr-10 pl-4 text-white text-base sm:text-lg font-medium placeholder-slate-600 outline-none"
               placeholder="0.00"
             />
           </div>
@@ -291,39 +247,41 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
 
       {/* Percentages */}
       <div>
-        <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3 pr-1">חלוקת אחוזים</h3>
-        <div className="bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 flex gap-4">
-            <div className="flex-1 bg-black/40 rounded-xl p-4 border border-white/5 relative overflow-hidden group">
+        <h3 className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 sm:mb-3 pr-1">חלוקת אחוזים</h3>
+        <div className="bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 flex gap-3 sm:gap-4">
+            <div className="flex-1 bg-black/40 rounded-xl p-3 sm:p-4 border border-white/5 relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-1 h-full bg-cyan-500/50"></div>
-               <label className="block text-cyan-400 text-xs mb-1 font-bold">אלי</label>
+               <label className="block text-cyan-400 text-[10px] sm:text-xs mb-1 font-bold">
+                 {partners.find(p => p.id === selectedPartnerId)?.name || 'שותף'}
+               </label>
                <div className="flex items-baseline gap-1">
                  <input
                   type="number"
                   value={eliPercent}
                   onChange={(e) => handleEliChange(e.target.value)}
-                  className="w-full bg-transparent text-2xl font-bold text-white outline-none"
+                  className="w-full bg-transparent text-xl sm:text-2xl font-bold text-white outline-none"
                  />
-                 <span className="text-slate-500 text-sm">%</span>
+                 <span className="text-slate-500 text-xs sm:text-sm">%</span>
                </div>
             </div>
-            <div className="flex-1 bg-black/40 rounded-xl p-4 border border-white/5 relative overflow-hidden group">
+            <div className="flex-1 bg-black/40 rounded-xl p-3 sm:p-4 border border-white/5 relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500/50"></div>
-               <label className="block text-indigo-400 text-xs mb-1 font-bold">שמעון</label>
+               <label className="block text-indigo-400 text-[10px] sm:text-xs mb-1 font-bold">שמעון</label>
                <div className="flex items-baseline gap-1">
                  <input
                   type="number"
                   value={shimonPercent}
                   onChange={(e) => handleShimonChange(e.target.value)}
-                  className="w-full bg-transparent text-2xl font-bold text-white outline-none"
+                  className="w-full bg-transparent text-xl sm:text-2xl font-bold text-white outline-none"
                  />
-                 <span className="text-slate-500 text-sm">%</span>
+                 <span className="text-slate-500 text-xs sm:text-sm">%</span>
                </div>
             </div>
         </div>
       </div>
 
       {/* Expenses Section */}
-      <div className="bg-slate-900/30 rounded-2xl p-5 border border-white/5">
+      <div className="bg-slate-900/30 rounded-2xl p-4 sm:p-5 border border-white/5">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-slate-300 font-semibold text-sm flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500/80"></span>
@@ -369,7 +327,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
               <div key={expense.id} className="flex justify-between items-center group">
                 <span className="text-slate-400 text-sm group-hover:text-slate-200 transition-colors">{expense.name}</span>
                 <div className="flex items-center gap-4">
-                  <span className="text-red-300/80 text-sm font-mono">- {expense.amount} ₪</span>
+                  <span className="text-red-300/80 text-sm font-mono">- ${expense.amount}</span>
                   <button onClick={() => removeExpense(expense.id)} className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
                     <Trash2 size={14} />
                   </button>
@@ -391,36 +349,38 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
       {/* Action Buttons - Calculation */}
       <button
         onClick={handleCalculate}
-        className="w-full relative overflow-hidden group bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl shadow-xl shadow-cyan-900/20 transition-all active:scale-[0.99]"
+        className="w-full relative overflow-hidden group bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 sm:py-4 rounded-xl shadow-xl shadow-cyan-900/20 transition-all active:scale-[0.99]"
       >
         <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 skew-y-12"></div>
-        <div className="relative flex justify-center items-center gap-2 text-lg">
-           <CalcIcon size={20} />
+        <div className="relative flex justify-center items-center gap-2 text-base sm:text-lg">
+           <CalcIcon size={18} className="sm:w-5 sm:h-5" />
            בצע חישוב
         </div>
       </button>
 
       {/* Result Area */}
       {result && (
-        <div className="relative overflow-hidden bg-slate-900/80 rounded-2xl p-1 border border-white/10 mt-8 shadow-2xl animate-fadeIn">
+        <div className="relative overflow-hidden bg-slate-900/80 rounded-2xl p-1 border border-white/10 mt-5 sm:mt-6 md:mt-8 shadow-2xl animate-fadeIn">
           {/* Decorative gradients */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/20 blur-[50px] pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/20 blur-[50px] pointer-events-none"></div>
           
-          <div className="relative bg-black/40 backdrop-blur-sm rounded-xl p-6">
-            <h4 className="text-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">תוצאות החלוקה</h4>
+          <div className="relative bg-black/40 backdrop-blur-sm rounded-xl p-4 sm:p-5 md:p-6">
+            <h4 className="text-center text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-4 sm:mb-5 md:mb-6">תוצאות החלוקה</h4>
             
-            <div className="flex gap-px bg-slate-800/50 rounded-2xl overflow-hidden mb-6 border border-white/5">
-                <div className="flex-1 p-5 text-center bg-gradient-to-b from-cyan-500/5 to-transparent">
-                    <p className="text-cyan-400 text-xs font-bold uppercase mb-1">חלקו של אלי</p>
-                    <p className="text-3xl font-black text-white tracking-tight drop-shadow-lg">{formatMoney(result.eliShare)}</p>
-                    <p className="text-slate-500 text-[10px] mt-1">{result.eliPercentage}%</p>
+            <div className="flex gap-px bg-slate-800/50 rounded-2xl overflow-hidden mb-4 sm:mb-5 md:mb-6 border border-white/5">
+                <div className="flex-1 p-3 sm:p-4 md:p-5 text-center bg-gradient-to-b from-cyan-500/5 to-transparent">
+                    <p className="text-cyan-400 text-[10px] sm:text-xs font-bold uppercase mb-1">
+                      חלקו של {partners.find(p => p.id === selectedPartnerId)?.name || 'שותף'}
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-lg">{formatMoney(result.eliShare)}</p>
+                    <p className="text-slate-500 text-[9px] sm:text-[10px] mt-1">{result.eliPercentage}%</p>
                 </div>
                 <div className="w-px bg-slate-800"></div>
-                <div className="flex-1 p-5 text-center bg-gradient-to-b from-indigo-500/5 to-transparent">
-                    <p className="text-indigo-400 text-xs font-bold uppercase mb-1">חלקו של שמעון</p>
-                    <p className="text-3xl font-black text-white tracking-tight drop-shadow-lg">{formatMoney(result.shimonShare)}</p>
-                    <p className="text-slate-500 text-[10px] mt-1">{result.shimonPercentage}%</p>
+                <div className="flex-1 p-3 sm:p-4 md:p-5 text-center bg-gradient-to-b from-indigo-500/5 to-transparent">
+                    <p className="text-indigo-400 text-[10px] sm:text-xs font-bold uppercase mb-1">חלקו של שמעון</p>
+                    <p className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-lg">{formatMoney(result.shimonShare)}</p>
+                    <p className="text-slate-500 text-[9px] sm:text-[10px] mt-1">{result.shimonPercentage}%</p>
                 </div>
             </div>
             
@@ -439,24 +399,24 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
       )}
 
       {/* Footer Actions */}
-      <div className="flex gap-4 pt-4">
+      <div className="flex gap-3 sm:gap-4 pt-3 sm:pt-4">
         <button
           onClick={handleReset}
-          className="bg-slate-800/50 hover:bg-slate-700/50 border border-white/5 text-slate-400 px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2 hover:text-white"
+          className="bg-slate-800/50 hover:bg-slate-700/50 border border-white/5 text-slate-400 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-medium transition-colors flex items-center gap-2 hover:text-white"
         >
-          <RotateCcw size={16} />
-          <span className="text-sm">איפוס</span>
+          <RotateCcw size={14} className="sm:w-4 sm:h-4" />
+          <span className="text-xs sm:text-sm">איפוס</span>
         </button>
         <button
           onClick={handleSave}
           disabled={!result}
-          className={`flex-1 font-bold py-3 rounded-xl flex justify-center items-center gap-2 transition-all border ${
+          className={`flex-1 font-bold py-2.5 sm:py-3 rounded-xl flex justify-center items-center gap-2 transition-all border text-sm sm:text-base ${
             result
               ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-600/30 hover:text-emerald-300 shadow-lg shadow-emerald-900/20'
               : 'bg-slate-800/50 border-white/5 text-slate-600 cursor-not-allowed'
           }`}
         >
-          <Save size={18} />
+          <Save size={16} className="sm:w-[18px] sm:h-[18px]" />
           שמור לעסקאות
         </button>
       </div>

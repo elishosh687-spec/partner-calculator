@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { UserData } from '../types';
@@ -11,6 +11,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   signup: (email: string, password: string, name: string, role: 'partner' | 'boss') => Promise<void>;
+  signInWithGoogle: (role: 'partner' | 'boss') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,6 +86,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const signInWithGoogle = async (role: 'partner' | 'boss') => {
+    const provider = new GoogleAuthProvider();
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+    
+    // בדוק אם המשתמש כבר קיים
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+    
+    // אם המשתמש לא קיים - צור אותו
+    if (!userDoc.exists()) {
+      await setDoc(userDocRef, {
+        name: user.displayName || user.email?.split('@')[0] || 'משתמש',
+        email: user.email,
+        role,
+        createdAt: new Date(),
+      });
+    }
+  };
+
   const value: AuthContextType = {
     currentUser,
     userData,
@@ -92,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     logout,
     signup,
+    signInWithGoogle,
   };
 
   return (

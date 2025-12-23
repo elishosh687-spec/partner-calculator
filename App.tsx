@@ -150,7 +150,17 @@ const App: React.FC = () => {
             
             <div className="animate-fadeIn">
               {activeTab === 'calculator' ? (
-                <Calculator onSave={handleSaveTransaction} />
+                userData.role === 'boss' ? (
+                  <Calculator onSave={handleSaveTransaction} currentUserId={currentUser.uid} />
+                ) : (
+                  <div className="text-center py-12 sm:py-16 md:py-20">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border border-white/5">
+                      <span className="text-3xl">🔒</span>
+                    </div>
+                    <p className="text-base sm:text-lg text-slate-300 font-medium">רק המנהל יכול להזין עסקאות</p>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-2">פנה למנהל להזנת עסקה חדשה</p>
+                  </div>
+                )
               ) : (
                 <HistoryView 
                   transactions={transactions} 

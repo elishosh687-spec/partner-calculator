@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User, Users } from 'lucide-react';
 import { Expense, TransactionResult } from '../types';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface CalculatorProps {
   onSave: (transaction: TransactionResult) => void;
+  currentUserId: string;
 }
 
-const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
+interface Partner {
+  id: string;
+  name: string;
+}
+
+const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
+  // Partners list
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
+  const [loadingPartners, setLoadingPartners] = useState(true);
+
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [totalRevenue, setTotalRevenue] = useState<string>('');
@@ -24,6 +37,36 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
 
   // Result State
   const [result, setResult] = useState<TransactionResult | null>(null);
+
+  // Load partners from Firestore
+  useEffect(() => {
+    const loadPartners = async () => {
+      try {
+        const q = query(collection(db, 'users'), where('role', '==', 'partner'));
+        const querySnapshot = await getDocs(q);
+        const partnersList: Partner[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          partnersList.push({
+            id: doc.id,
+            name: data.name,
+          });
+        });
+        
+        setPartners(partnersList);
+        if (partnersList.length > 0) {
+          setSelectedPartnerId(partnersList[0].id);
+        }
+      } catch (error) {
+        console.error('❌ שגיאה בטעינת שותפים:', error);
+      } finally {
+        setLoadingPartners(false);
+      }
+    };
+
+    loadPartners();
+  }, []);
 
   // Calculate percentages dynamically
   const handleEliChange = (val: string) => {
@@ -60,10 +103,18 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
 
   // Calculation Logic
   const handleCalculate = () => {
+    if (!selectedPartnerId) {
+      alert('אנא בחר שותף');
+      return;
+    }
+
     const revenue = parseFloat(totalRevenue) || 0;
     const net = revenue - totalExpenses;
+    const selectedPartner = partners.find(p => p.id === selectedPartnerId);
     
     const res: TransactionResult = {
+      partnerId: selectedPartnerId,
+      partnerName: selectedPartner?.name || 'שותף',
       customerName: customerName || 'לקוח מזדמן',
       date,
       totalRevenue: revenue,
@@ -87,6 +138,9 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
     setResult(null);
     setEliPercent(20);
     setShimonPercent(80);
+    if (partners.length > 0) {
+      setSelectedPartnerId(partners[0].id);
+    }
   };
 
   const handleSave = () => {
@@ -101,8 +155,50 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave }) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   };
 
+  if (loadingPartners) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto"></div>
+        <p className="text-slate-400 mt-4">טוען שותפים...</p>
+      </div>
+    );
+  }
+
+  if (partners.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-14 h-14 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+          <Users className="text-slate-600" size={28} />
+        </div>
+        <p className="text-base text-slate-300 font-medium">אין שותפים במערכת</p>
+        <p className="text-xs text-slate-500 mt-2">צריך להוסיף שותפים כדי ליצור עסקאות</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 sm:space-y-6 md:space-y-8">
+      {/* Partner Selection */}
+      <div className="bg-gradient-to-r from-purple-500/10 to-cyan-500/10 p-4 sm:p-5 rounded-2xl border border-white/10">
+        <label className="block text-slate-300 text-sm font-bold mb-3 flex items-center gap-2">
+          <Users size={18} />
+          בחר שותף לעסקה
+        </label>
+        <select
+          value={selectedPartnerId}
+          onChange={(e) => setSelectedPartnerId(e.target.value)}
+          className="w-full input-premium rounded-xl py-3 px-4 text-white text-lg font-medium outline-none appearance-none cursor-pointer"
+          style={{ backgroundImage: 'none' }}
+        >
+          {partners.map((partner) => (
+            <option key={partner.id} value={partner.id} className="bg-slate-900">
+              {partner.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-slate-500 text-xs mt-2">העסקה תשוייך ל-{partners.find(p => p.id === selectedPartnerId)?.name}</p>
+      </div>
+
       {/* Top Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
         <div className="relative group">

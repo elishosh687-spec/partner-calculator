@@ -251,7 +251,9 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
         <div className="bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 flex gap-3 sm:gap-4">
             <div className="flex-1 bg-black/40 rounded-xl p-3 sm:p-4 border border-white/5 relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-1 h-full bg-cyan-500/50"></div>
-               <label className="block text-cyan-400 text-[10px] sm:text-xs mb-1 font-bold">אלי</label>
+               <label className="block text-cyan-400 text-[10px] sm:text-xs mb-1 font-bold">
+                 {partners.find(p => p.id === selectedPartnerId)?.name || 'שותף'}
+               </label>
                <div className="flex items-baseline gap-1">
                  <input
                   type="number"
@@ -368,7 +370,9 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
             
             <div className="flex gap-px bg-slate-800/50 rounded-2xl overflow-hidden mb-4 sm:mb-5 md:mb-6 border border-white/5">
                 <div className="flex-1 p-3 sm:p-4 md:p-5 text-center bg-gradient-to-b from-cyan-500/5 to-transparent">
-                    <p className="text-cyan-400 text-[10px] sm:text-xs font-bold uppercase mb-1">חלקו של אלי</p>
+                    <p className="text-cyan-400 text-[10px] sm:text-xs font-bold uppercase mb-1">
+                      חלקו של {partners.find(p => p.id === selectedPartnerId)?.name || 'שותף'}
+                    </p>
                     <p className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-lg">{formatMoney(result.eliShare)}</p>
                     <p className="text-slate-500 text-[9px] sm:text-[10px] mt-1">{result.eliPercentage}%</p>
                 </div>

@@ -1,0 +1,103 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { UserData } from '../types';
+
+interface AuthContextType {
+  currentUser: User | null;
+  userData: UserData | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  signup: (email: string, password: string, name: string, role: 'partner' | 'boss') => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      
+      if (user) {
+        // טעינת נתוני המשתמש מ-Firestore
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUserData({
+              id: user.uid,
+              name: data.name,
+              email: data.email,
+              role: data.role,
+              createdAt: data.createdAt?.toDate() || new Date(),
+            });
+          } else {
+            setUserData(null);
+          }
+        } catch (error) {
+          console.error('❌ שגיאה בטעינת נתוני משתמש:', error);
+          setUserData(null);
+        }
+      } else {
+        setUserData(null);
+      }
+      
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  const signup = async (email: string, password: string, name: string, role: 'partner' | 'boss') => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    // יצירת מסמך משתמש ב-Firestore
+    await setDoc(doc(db, 'users', user.uid), {
+      name,
+      email,
+      role,
+      createdAt: new Date(),
+    });
+  };
+
+  const value: AuthContextType = {
+    currentUser,
+    userData,
+    loading,
+    login,
+    logout,
+    signup,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+};
+

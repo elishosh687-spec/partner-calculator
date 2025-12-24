@@ -6,20 +6,21 @@ export interface Expense {
 
 export interface TransactionResult {
   id?: string; // Firebase document ID
-  partnerId: string; // 🆕 ID של השותף שיצר את העסקה
-  partnerName?: string; // 🆕 שם השותף (לתצוגה)
-  bossId?: string; // 🆕 ID של הבוס בעסקה
-  bossName?: string; // 🆕 שם הבוס (לתצוגה)
+  partnerId: string; // Partner ID who created the transaction
+  partnerName?: string; // Partner name (for display)
+  bossId?: string; // EcoBrothers ID in the transaction
+  bossName?: string; // EcoBrothers name (for display)
   customerName: string;
   date: string;
   totalRevenue: number;
   totalExpenses: number;
   netProfit: number;
   eliShare: number;
-  shimonShare: number;
+  ecobrothersShare: number;
   eliPercentage: number;
-  shimonPercentage: number;
-  expenses?: Expense[]; // רשימת הוצאות מפורטת
+  ecobrothersPercentage: number;
+  expenses?: Expense[]; // Detailed expenses list
+  isPaidToPartner?: boolean; // Payment status to partner
 }
 
 export interface UserData {

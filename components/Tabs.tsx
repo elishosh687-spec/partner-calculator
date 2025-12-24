@@ -17,7 +17,7 @@ const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
             : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
         }`}
       >
-        עסקאות קודמות
+        Previous Transactions
       </button>
       <button
         onClick={() => setActiveTab('calculator')}
@@ -27,7 +27,7 @@ const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
             : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
         }`}
       >
-        מחשבון חדש
+        New Calculator
       </button>
     </div>
   );

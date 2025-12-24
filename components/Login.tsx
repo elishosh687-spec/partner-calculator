@@ -32,7 +32,7 @@ const Login: React.FC = () => {
     try {
       if (isSignup) {
         if (!name) {
-          setError('נא להזין שם');
+          setError('Please enter a name');
           setLoading(false);
           return;
         }
@@ -43,26 +43,26 @@ const Login: React.FC = () => {
     } catch (err: any) {
       console.error('Authentication error:', err);
       
-      // הודעות שגיאה בעברית
+      // Error messages in English
       switch (err.code) {
         case 'auth/invalid-email':
-          setError('כתובת אימייל לא תקינה');
+          setError('Invalid email address');
           break;
         case 'auth/user-not-found':
         case 'auth/wrong-password':
-          setError('אימייל או סיסמה שגויים');
+          setError('Incorrect email or password');
           break;
         case 'auth/email-already-in-use':
-          setError('האימייל כבר קיים במערכת');
+          setError('Email already exists in system');
           break;
         case 'auth/weak-password':
-          setError('הסיסמה חלשה מדי (לפחות 6 תווים)');
+          setError('Password too weak (at least 6 characters)');
           break;
         case 'auth/invalid-credential':
-          setError('פרטי התחברות שגויים');
+          setError('Invalid login credentials');
           break;
         default:
-          setError('שגיאה בהתחברות. נסה שוב.');
+          setError('Login error. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -80,16 +80,16 @@ const Login: React.FC = () => {
       
       switch (err.code) {
         case 'auth/popup-closed-by-user':
-          setError('החלון נסגר לפני השלמת ההתחברות');
+          setError('Window closed before completing login');
           break;
         case 'auth/cancelled-popup-request':
-          setError('התהליך בוטל');
+          setError('Process cancelled');
           break;
         case 'auth/popup-blocked':
-          setError('החלון נחסם על ידי הדפדפן. אנא אפשר חלונות קופצים.');
+          setError('Window blocked by browser. Please allow popups.');
           break;
         default:
-          setError('שגיאה בהתחברות עם Google. נסה שוב.');
+          setError('Error signing in with Google. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -105,10 +105,10 @@ const Login: React.FC = () => {
             <LogIn className="w-12 h-12 text-cyan-400" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">
-            מחשבון שותפים
+            Partner Calculator
           </h1>
           <p className="text-slate-400 text-sm">
-            {isSignup ? 'צור חשבון חדש' : 'התחבר לחשבונך'}
+            {isSignup ? 'Create new account' : 'Sign in to your account'}
           </p>
         </div>
 
@@ -120,14 +120,14 @@ const Login: React.FC = () => {
                 {/* Name Input */}
                 <div>
                   <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                    שם מלא
+                    Full Name
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full input-premium rounded-xl py-3 px-4 text-white placeholder-slate-600 outline-none"
-                    placeholder="ישראל ישראלי"
+                    placeholder="John Doe"
                     required={isSignup}
                   />
                 </div>
@@ -135,7 +135,7 @@ const Login: React.FC = () => {
                 {/* Role Selection */}
                 <div>
                   <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                    תפקיד
+                    Role
                   </label>
                   <div className="flex gap-3">
                     <button
@@ -147,7 +147,7 @@ const Login: React.FC = () => {
                           : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                       }`}
                     >
-                      שותף
+                      Partner
                     </button>
                     <button
                       type="button"
@@ -158,7 +158,7 @@ const Login: React.FC = () => {
                           : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                       }`}
                     >
-                      בוס
+                      EcoBrothers
                     </button>
                   </div>
                 </div>
@@ -168,7 +168,7 @@ const Login: React.FC = () => {
             {/* Email Input */}
             <div>
               <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                אימייל
+                Email
               </label>
               <input
                 type="email"
@@ -184,7 +184,7 @@ const Login: React.FC = () => {
             {/* Password Input */}
             <div>
               <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                סיסמה
+                Password
               </label>
               <div className="relative">
                 <input
@@ -219,7 +219,7 @@ const Login: React.FC = () => {
                 <div className="w-full border-t border-slate-700"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-slate-900 px-2 text-slate-500">או</span>
+                <span className="bg-slate-900 px-2 text-slate-500">OR</span>
               </div>
             </div>
 
@@ -233,12 +233,12 @@ const Login: React.FC = () => {
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
-                  <span>מתחבר...</span>
+                  <span>Signing in...</span>
                 </>
               ) : (
                 <>
                   <GoogleIcon />
-                  <span>{isSignup ? 'הירשם' : 'התחבר'} עם Google</span>
+                  <span>{isSignup ? 'Sign up' : 'Sign in'} with Google</span>
                 </>
               )}
             </button>
@@ -252,12 +252,12 @@ const Login: React.FC = () => {
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>מתחבר...</span>
+                  <span>Signing in...</span>
                 </>
               ) : (
                 <>
                   {isSignup ? <UserPlus size={18} /> : <LogIn size={18} />}
-                  <span>{isSignup ? 'צור חשבון' : 'התחבר'}</span>
+                  <span>{isSignup ? 'Create Account' : 'Sign In'}</span>
                 </>
               )}
             </button>
@@ -272,16 +272,16 @@ const Login: React.FC = () => {
               }}
               className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors"
             >
-              {isSignup ? 'כבר יש לך חשבון? התחבר' : 'אין לך חשבון? הירשם'}
+              {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
           </div>
         </div>
 
         {/* Demo Users Info */}
         <div className="mt-6 glass-panel rounded-xl p-4 text-center">
-          <p className="text-slate-400 text-xs mb-2">💡 למשתמשים חדשים:</p>
+          <p className="text-slate-400 text-xs mb-2">💡 For new users:</p>
           <p className="text-slate-500 text-[10px]">
-            צור חשבון ראשון כ"בוס" כדי לראות את כל העסקאות
+            Create first account as "EcoBrothers" to see all transactions
           </p>
         </div>
       </div>

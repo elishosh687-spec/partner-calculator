@@ -9,7 +9,7 @@ const Header: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleLogout = async () => {
-    if (confirm('האם אתה בטוח שברצונך להתנתק?')) {
+    if (confirm('Are you sure you want to log out?')) {
       await logout();
     }
   };
@@ -26,7 +26,7 @@ const Header: React.FC = () => {
 
   const handleSaveName = async () => {
     if (!newName || newName.trim().length === 0) {
-      alert('שם לא יכול להיות ריק');
+      alert('Name cannot be empty');
       return;
     }
 
@@ -40,8 +40,8 @@ const Header: React.FC = () => {
       await updateUserName(newName.trim());
       setIsEditingName(false);
     } catch (error: any) {
-      console.error('❌ שגיאה בעדכון שם:', error);
-      alert(`שגיאה בעדכון השם: ${error.message || 'נסה שוב'}`);
+      console.error('❌ Error updating name:', error);
+      alert(`Error updating name: ${error.message || 'Try again'}`);
     } finally {
       setIsSaving(false);
     }
@@ -60,12 +60,12 @@ const Header: React.FC = () => {
             )}
             <span className="text-white text-sm font-medium">{userData?.name}</span>
             {userData?.role === 'boss' && (
-              <span className="text-[10px] text-yellow-400/80 font-bold uppercase">מנהל</span>
+              <span className="text-[10px] text-yellow-400/80 font-bold uppercase">Manager</span>
             )}
             <button
               onClick={handleStartEdit}
               className="ml-2 p-1 hover:bg-white/10 rounded transition-colors"
-              title="ערוך שם"
+              title="Edit name"
             >
               <Edit2 className="w-3 h-3 text-slate-400 hover:text-cyan-400" />
             </button>
@@ -96,7 +96,7 @@ const Header: React.FC = () => {
               onClick={handleSaveName}
               disabled={isSaving || !newName.trim()}
               className="p-1 hover:bg-green-500/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="שמור"
+              title="Save"
             >
               <Check className="w-3 h-3 text-green-400" />
             </button>
@@ -104,7 +104,7 @@ const Header: React.FC = () => {
               onClick={handleCancelEdit}
               disabled={isSaving}
               className="p-1 hover:bg-red-500/20 rounded transition-colors disabled:opacity-50"
-              title="ביטול"
+              title="Cancel"
             >
               <X className="w-3 h-3 text-red-400" />
             </button>
@@ -116,7 +116,7 @@ const Header: React.FC = () => {
           className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 text-red-400 hover:text-red-300 px-4 py-2 rounded-full transition-all text-sm"
         >
           <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline">יציאה</span>
+          <span className="hidden sm:inline">Logout</span>
         </button>
       </div>
 
@@ -125,11 +125,11 @@ const Header: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 sm:w-32 sm:h-32 bg-cyan-500/20 blur-3xl rounded-full pointer-events-none"></div>
         <h1 className="relative text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-2 sm:mb-3 tracking-tight drop-shadow-2xl">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-400 filter drop-shadow-lg">
-            מחשבון שותפים
+            Partner Calculator
           </span>
         </h1>
         <p className="text-slate-400/80 text-sm sm:text-base md:text-lg font-light tracking-[0.15em] sm:tracking-[0.2em] uppercase">
-          ניהול עסקאות והכנסות
+          Transaction & Revenue Management
         </p>
       </div>
     </div>

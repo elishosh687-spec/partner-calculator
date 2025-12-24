@@ -2,48 +2,49 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // פונקציית עזר - בדיקה אם המשתמש מחובר
+    // Helper function - check if user is signed in
     function isSignedIn() {
       return request.auth != null;
     }
     
-    // פונקציית עזר - בדיקה אם המשתמש הוא בוס
+    // Helper function - check if user is EcoBrothers (boss)
     function isBoss() {
       return isSignedIn() && 
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'boss';
     }
     
-    // פונקציית עזר - בדיקה אם המשתמש הוא בעל המסמך
+    // Helper function - check if user is owner of document
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    // חוקים לאוסף המשתמשים
+    // Rules for users collection
     match /users/{userId} {
-      // קריאה: המשתמש עצמו או בוס
+      // Read: user themselves or EcoBrothers
       allow read: if isOwner(userId) || isBoss();
       
-      // יצירה: רק במהלך הרשמה (המשתמש יוצר את המסמך שלו)
+      // Create: only during registration (user creates their own document)
       allow create: if isOwner(userId) && 
                        request.resource.data.keys().hasAll(['name', 'email', 'role', 'createdAt']);
       
-      // עדכון: רק המשתמש עצמו (לא יכול לשנות תפקיד)
+      // Update: only user themselves (cannot change role)
       allow update: if isOwner(userId) && 
                        request.resource.data.role == resource.data.role;
       
-      // מחיקה: אסורה
+      // Delete: forbidden
       allow delete: if false;
     }
     
-    // חוקים לאוסף העסקאות
+    // Rules for transactions collection
     match /transactions/{transactionId} {
-      // קריאה: בוס רואה הכל, שותף רואה רק את שלו
+      // Read: EcoBrothers sees all, partner sees only their own
       allow read: if isSignedIn() && 
                      (isBoss() || resource.data.partnerId == request.auth.uid);
       
-      // יצירה: 
-      // - בוס יכול ליצור עסקה עבור כל שותף (partnerId יכול להיות של מישהו אחר)
-      // - שותף יכול ליצור עסקה רק לעצמו (partnerId חייב להיות שלו)
+      // Create: 
+      // - EcoBrothers can create transaction for any partner (partnerId can be someone else's)
+      // - Partner can create transaction only for themselves (partnerId must be theirs)
+      // Support both old (shimonShare/shimonPercentage) and new (ecobrothersShare/ecobrothersPercentage) field names
       allow create: if isSignedIn() && 
                        (isBoss() || request.resource.data.partnerId == request.auth.uid) &&
                        request.resource.data.keys().hasAll([
@@ -55,24 +56,25 @@ service cloud.firestore {
                          'totalExpenses',
                          'netProfit',
                          'eliShare',
-                         'shimonShare',
                          'eliPercentage',
-                         'shimonPercentage',
                          'createdAt'
                        ]) &&
-                       // bossId ו-bossName הם אופציונליים (לתמיכה בעסקאות ישנות)
+                       // Must have either old or new field names for EcoBrothers share
+                       (request.resource.data.keys().hasAny(['shimonShare', 'ecobrothersShare'])) &&
+                       (request.resource.data.keys().hasAny(['shimonPercentage', 'ecobrothersPercentage'])) &&
+                       // bossId and bossName are optional (for support of old transactions)
                        (!request.resource.data.keys().hasAny(['bossId']) || 
                         request.resource.data.keys().hasAll(['bossId', 'bossName']));
       
-      // עדכון: 
-      // - בוס יכול לעדכן כל עסקה ולשנות partnerId/partnerName (לתיקון נתונים ישנים)
-      // - בעל העסקה יכול לעדכן את העסקה שלו (אבל לא יכול לשנות partnerId)
+      // Update: 
+      // - EcoBrothers can update any transaction and change partnerId/partnerName (for fixing old data)
+      // - Transaction owner can update their transaction (but cannot change partnerId)
       allow update: if isSignedIn() && 
                        (isBoss() || 
                         (resource.data.partnerId == request.auth.uid && 
                          request.resource.data.partnerId == resource.data.partnerId));
       
-      // מחיקה: בעל העסקה או בוס
+      // Delete: transaction owner or EcoBrothers
       allow delete: if isSignedIn() && 
                        (resource.data.partnerId == request.auth.uid || isBoss());
     }

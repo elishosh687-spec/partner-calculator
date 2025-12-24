@@ -18,15 +18,16 @@ interface Boss {
 interface HistoryViewProps {
   transactions: TransactionResult[];
   onClearHistory: () => void;
-  onUpdateTransaction?: (transactionId: string, newPartnerId: string, newPartnerName: string) => void;
+  onUpdateTransaction?: (transactionId: string, newPartnerId: string, newPartnerName: string, newBossId?: string, newBossName?: string) => void;
   onDeleteTransaction?: (transactionId: string) => void;
   onEditTransaction?: (transaction: TransactionResult) => void;
+  onUpdatePaymentStatus?: (transactionId: string, isPaid: boolean) => void;
   userRole: 'partner' | 'boss';
 }
 
-const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory, onUpdateTransaction, onDeleteTransaction, onEditTransaction, userRole }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory, onUpdateTransaction, onDeleteTransaction, onEditTransaction, onUpdatePaymentStatus, userRole }) => {
   const { userData } = useAuth();
-  const bossName = userData?.role === 'boss' ? userData.name : 'שמעון';
+  const ecobrothersName = userData?.role === 'boss' ? userData.name : 'EcoBrothers';
   
   const [selectedPartner, setSelectedPartner] = useState<string>('all');
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -36,7 +37,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
   const [selectedBossForEdit, setSelectedBossForEdit] = useState<string>('');
   const [selectedTransactionForDetails, setSelectedTransactionForDetails] = useState<TransactionResult | null>(null);
 
-  // טעינת רשימת שותפים (רק לבוס)
+  // Load partners list (only for boss)
   useEffect(() => {
     if (userRole !== 'boss' || !onUpdateTransaction) return;
 
@@ -56,14 +57,14 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
         
         setPartners(partnersList);
       } catch (error) {
-        console.error('❌ שגיאה בטעינת שותפים:', error);
+        console.error('❌ Error loading partners:', error);
       }
     };
 
     loadPartners();
   }, [userRole, onUpdateTransaction]);
 
-  // טעינת רשימת בוסים (רק לבוס)
+  // Load bosses list (only for boss)
   useEffect(() => {
     if (userRole !== 'boss' || !onUpdateTransaction) return;
 
@@ -81,10 +82,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
           });
         });
         
-        console.log('✅ טעינתי בוסים:', bossesList.length, bossesList.map(b => b.name));
+        console.log('✅ Loaded bosses:', bossesList.length, bossesList.map(b => b.name));
         setBosses(bossesList);
       } catch (error) {
-        console.error('❌ שגיאה בטעינת בוסים:', error);
+        console.error('❌ Error loading bosses:', error);
       }
     };
 
@@ -97,9 +98,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
     if (editingTransactionId && partners.length > 0 && selectedPartnerForEdit) {
       const partnerExists = partners.find(p => p.id === selectedPartnerForEdit);
       if (!partnerExists) {
-        // השותף לא קיים, בחר את הראשון
+        // Partner doesn't exist, select first one
         setSelectedPartnerForEdit(partners[0].id);
-        console.warn('⚠️ השותף שנבחר לא נמצא ברשימה, נבחר שותף אחר:', partners[0].name);
+        console.warn('⚠️ Selected partner not found in list, selecting different partner:', partners[0].name);
       }
     }
   }, [partners, editingTransactionId, selectedPartnerForEdit]);
@@ -112,46 +113,46 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
     if (!transaction.id) return;
     setEditingTransactionId(transaction.id);
     
-    // בדוק אם השותף קיים ברשימת השותפים
+    // Check if partner exists in partners list
     const partnerExists = partners.find(p => p.id === transaction.partnerId);
     if (partnerExists) {
       setSelectedPartnerForEdit(transaction.partnerId);
     } else {
-      // אם השותף לא קיים (למשל שינה role), בחר את השותף הראשון מהרשימה
+      // If partner doesn't exist (e.g. changed role), select first partner from list
       if (partners.length > 0) {
         setSelectedPartnerForEdit(partners[0].id);
-        console.warn('⚠️ השותף המקורי לא נמצא ברשימה, נבחר שותף אחר:', {
+        console.warn('⚠️ Original partner not found in list, selecting different partner:', {
           originalPartnerId: transaction.partnerId,
           originalPartnerName: transaction.partnerName,
           selectedPartner: partners[0].name
         });
       } else {
         setSelectedPartnerForEdit('');
-        console.error('❌ אין שותפים במערכת');
+        console.error('❌ No partners in system');
       }
     }
     
-    // בדוק אם הבוס קיים ברשימת הבוסים
+    // Check if boss exists in bosses list
     if (transaction.bossId) {
       const bossExists = bosses.find(b => b.id === transaction.bossId);
       if (bossExists) {
         setSelectedBossForEdit(transaction.bossId);
       } else {
-        // אם הבוס לא קיים, בחר את הבוס הראשון מהרשימה
+        // If boss doesn't exist, select first boss from list
         if (bosses.length > 0) {
           setSelectedBossForEdit(bosses[0].id);
-          console.warn('⚠️ הבוס המקורי לא נמצא ברשימה, נבחר בוס אחר:', {
+          console.warn('⚠️ Original boss not found in list, selecting different boss:', {
             originalBossId: transaction.bossId,
             originalBossName: transaction.bossName,
             selectedBoss: bosses[0].name
           });
         } else {
           setSelectedBossForEdit('');
-          console.error('❌ אין בוסים במערכת');
+          console.error('❌ No bosses in system');
         }
       }
     } else if (bosses.length > 0) {
-      // אם אין bossId בעסקה הישנה, בוחרים את הבוס הראשון
+      // If no bossId in old transaction, select first boss
       setSelectedBossForEdit(bosses[0].id);
     }
   };
@@ -164,7 +165,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
 
   const handleSaveEdit = (transactionId: string) => {
     if (!onUpdateTransaction || !selectedPartnerForEdit) {
-      console.error('❌ חסר onUpdateTransaction או selectedPartnerForEdit');
+      console.error('❌ Missing onUpdateTransaction or selectedPartnerForEdit');
       return;
     }
     
@@ -172,7 +173,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
     const selectedBoss = bosses.find(b => b.id === selectedBossForEdit);
     
     if (selectedPartner) {
-      console.log('✏️ מעדכן עסקה:', { 
+      console.log('✏️ Updating transaction:', { 
         transactionId, 
         partnerId: selectedPartner.id, 
         partnerName: selectedPartner.name,
@@ -190,12 +191,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
       setSelectedPartnerForEdit('');
       setSelectedBossForEdit('');
     } else {
-      console.error('❌ שותף לא נמצא:', {
+      console.error('❌ Partner not found:', {
         searchedId: selectedPartnerForEdit,
         availablePartners: partners.map(p => ({ id: p.id, name: p.name })),
         partnersCount: partners.length
       });
-      alert(`שגיאה: שותף לא נמצא. אנא רענן את הדף ונסה שוב.\n\nשותפים זמינים: ${partners.length > 0 ? partners.map(p => p.name).join(', ') : 'אין שותפים במערכת'}`);
+      alert(`Error: Partner not found. Please refresh the page and try again.\n\nAvailable partners: ${partners.length > 0 ? partners.map(p => p.name).join(', ') : 'No partners in system'}`);
     }
   };
 
@@ -220,7 +221,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
   }, [transactions, selectedPartner, userRole]);
 
   const totalEli = filteredTransactions.reduce((sum, t) => sum + t.eliShare, 0);
-  const totalShimon = filteredTransactions.reduce((sum, t) => sum + t.shimonShare, 0);
+  const totalEcoBrothers = filteredTransactions.reduce((sum, t) => sum + t.ecobrothersShare, 0);
 
   if (transactions.length === 0) {
     return (
@@ -228,20 +229,20 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
         <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border border-white/5">
              <TrendingUp className="text-slate-600" size={28} />
         </div>
-        <p className="text-base sm:text-lg text-slate-300 font-medium">אין עסקאות שמורות</p>
-        <p className="text-xs sm:text-sm text-slate-500 mt-2">ההיסטוריה שלך ריקה כרגע</p>
+        <p className="text-base sm:text-lg text-slate-300 font-medium">No saved transactions</p>
+        <p className="text-xs sm:text-sm text-slate-500 mt-2">Your history is currently empty</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-5 sm:space-y-6 md:space-y-8 animate-fadeIn">
-      {/* סינון לפי שותף - רק למנהל */}
+      {/* Filter by partner - only for manager */}
       {userRole === 'boss' && uniquePartners.length > 0 && (
         <div className="bg-slate-900/50 p-4 rounded-2xl border border-white/5">
           <div className="flex items-center gap-2 mb-3">
             <Filter className="w-4 h-4 text-cyan-400" />
-            <span className="text-slate-300 text-sm font-medium">סינון לפי שותף</span>
+            <span className="text-slate-300 text-sm font-medium">Filter by Partner</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -252,7 +253,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                   : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
               }`}
             >
-              כולם ({transactions.length})
+              All ({transactions.length})
             </button>
             {uniquePartners.map(partner => {
               const count = transactions.filter(t => t.partnerId === partner.id).length;
@@ -278,13 +279,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <div className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 p-3 sm:p-4 md:p-5 rounded-2xl border border-cyan-500/10 shadow-lg relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-20 h-20 bg-cyan-500/10 blur-xl rounded-full"></div>
-          <p className="text-cyan-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">סה"כ שותפים</p>
+          <p className="text-cyan-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">Total Partners</p>
           <p className="text-xl sm:text-2xl md:text-3xl font-black text-white">{formatMoney(totalEli)}</p>
         </div>
         <div className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 p-3 sm:p-4 md:p-5 rounded-2xl border border-indigo-500/10 shadow-lg relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-20 h-20 bg-indigo-500/10 blur-xl rounded-full"></div>
-          <p className="text-indigo-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">סה"כ {bossName}</p>
-          <p className="text-xl sm:text-2xl md:text-3xl font-black text-white">{formatMoney(totalShimon)}</p>
+          <p className="text-indigo-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">Total {ecobrothersName}</p>
+          <p className="text-xl sm:text-2xl md:text-3xl font-black text-white">{formatMoney(totalEcoBrothers)}</p>
         </div>
       </div>
 
@@ -298,31 +299,29 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
               <>
                 <col style={{ width: '130px' }} />
                 <col style={{ width: '130px' }} />
-                {onUpdateTransaction && <col style={{ width: '90px' }} />}
-                {onDeleteTransaction && <col style={{ width: '60px' }} />}
+                <col style={{ width: '90px' }} />
+                <col style={{ width: '60px' }} />
               </>
             )}
+            <col style={{ width: '80px' }} />
             <col style={{ width: '150px' }} />
             <col style={{ width: '150px' }} />
           </colgroup>
           <thead className="text-xs md:text-sm text-slate-400 uppercase bg-slate-900/80 font-bold tracking-wider">
             <tr>
-              <th className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">תאריך</th>
-              <th className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">לקוח</th>
+              <th className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">Date</th>
+              <th className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">Client</th>
               {userRole === 'boss' && (
                 <>
-                  <th className="px-3 py-3 md:px-4 md:py-4 text-purple-400/80 whitespace-nowrap">שותף</th>
-                  <th className="px-3 py-3 md:px-4 md:py-4 text-yellow-400/80 whitespace-nowrap">בוס</th>
-                  {onUpdateTransaction && (
-                    <th className="px-3 py-3 md:px-4 md:py-4 text-slate-400/80 whitespace-nowrap">פעולות</th>
-                  )}
-                  {onDeleteTransaction && (
-                    <th className="px-3 py-3 md:px-4 md:py-4 text-red-400/80 whitespace-nowrap">מחיקה</th>
-                  )}
+                  <th className="px-3 py-3 md:px-4 md:py-4 text-purple-400/80 whitespace-nowrap">Partner</th>
+                  <th className="px-3 py-3 md:px-4 md:py-4 text-yellow-400/80 whitespace-nowrap">EcoBrothers</th>
+                  <th className="px-3 py-3 md:px-4 md:py-4 text-slate-400/80 whitespace-nowrap">Actions</th>
+                  <th className="px-3 py-3 md:px-4 md:py-4 text-red-400/80 whitespace-nowrap">Delete</th>
                 </>
               )}
-              <th className="px-3 py-3 md:px-4 md:py-4 text-cyan-400/80 whitespace-nowrap">חלק שותף</th>
-              <th className="px-3 py-3 md:px-4 md:py-4 text-indigo-400/80 whitespace-nowrap">חלק בוס</th>
+              <th className="px-3 py-3 md:px-4 md:py-4 text-emerald-400/80 whitespace-nowrap">Paid</th>
+              <th className="px-3 py-3 md:px-4 md:py-4 text-cyan-400/80 whitespace-nowrap">Partner Share</th>
+              <th className="px-3 py-3 md:px-4 md:py-4 text-indigo-400/80 whitespace-nowrap">EcoBrothers Share</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -333,7 +332,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
               >
                 <td className="px-3 py-3 md:px-4 md:py-4 text-slate-400 whitespace-nowrap text-sm md:text-base font-mono">{t.date}</td>
                 <td className="px-3 py-3 md:px-4 md:py-4 font-medium text-slate-200 group-hover:text-white transition-colors text-sm md:text-base truncate">
-                  <div className="flex items-center gap-2 cursor-pointer hover:text-cyan-400" onClick={(e) => { e.stopPropagation(); setSelectedTransactionForDetails(t); }} title="לחץ לפרטים">
+                  <div className="flex items-center gap-2 cursor-pointer hover:text-cyan-400" onClick={(e) => { e.stopPropagation(); setSelectedTransactionForDetails(t); }} title="Click for details">
                     <Eye className="w-4 h-4 text-cyan-400/70 hover:text-cyan-400 flex-shrink-0" />
                     <span>{t.customerName}</span>
                   </div>
@@ -349,7 +348,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                           className="bg-slate-800 border border-purple-500/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-purple-400 w-full"
                         >
                           {partners.length === 0 ? (
-                            <option value="" className="bg-slate-900">אין שותפים</option>
+                            <option value="" className="bg-slate-900">No partners</option>
                           ) : (
                             partners.map((partner) => (
                               <option key={partner.id} value={partner.id} className="bg-slate-900">
@@ -361,7 +360,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                       ) : (
                         <div className="flex items-center gap-1">
                           <User className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{t.partnerName || 'לא ידוע'}</span>
+                          <span className="truncate">{t.partnerName || 'Unknown'}</span>
                         </div>
                       )}
                     </td>
@@ -374,7 +373,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                           className="bg-slate-800 border border-yellow-500/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-yellow-400 w-full"
                         >
                           {bosses.length === 0 ? (
-                            <option value="" className="bg-slate-900">אין בוסים</option>
+                            <option value="" className="bg-slate-900">No bosses</option>
                           ) : (
                             bosses.map((boss) => (
                               <option key={boss.id} value={boss.id} className="bg-slate-900">
@@ -386,25 +385,25 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                       ) : (
                         <div className="flex items-center gap-1">
                           <Crown className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{t.bossName || 'לא ידוע'}</span>
+                          <span className="truncate">{t.bossName || 'Unknown'}</span>
                         </div>
                       )}
                     </td>
-                    {onUpdateTransaction && (
-                      <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        {editingTransactionId === t.id ? (
+                    <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {onUpdateTransaction ? (
+                        editingTransactionId === t.id ? (
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => t.id && handleSaveEdit(t.id)}
                               className="text-emerald-400 hover:text-emerald-300 transition-colors"
-                              title="שמור"
+                              title="Save"
                             >
                               <Check size={16} />
                             </button>
                             <button
                               onClick={handleCancelEdit}
                               className="text-red-400 hover:text-red-300 transition-colors"
-                              title="בטל"
+                              title="Cancel"
                             >
                               <X size={16} />
                             </button>
@@ -414,7 +413,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                             <button
                               onClick={(e) => { e.stopPropagation(); handleStartEdit(t); }}
                               className="text-purple-400 hover:text-purple-300 transition-colors"
-                              title="ערוך שותף ובוס"
+                              title="Edit partner and boss"
                             >
                               <Pencil size={16} />
                             </button>
@@ -422,42 +421,69 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                               <button
                                 onClick={(e) => { e.stopPropagation(); onEditTransaction(t); }}
                                 className="text-blue-400 hover:text-blue-300 transition-colors"
-                                title="ערוך עסקה מלא"
+                                title="Edit full transaction"
                               >
                                 <FileEdit size={16} />
                               </button>
                             )}
                           </div>
-                        )}
-                      </td>
-                    )}
-                    {onDeleteTransaction && t.id && (
-                      <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                        )
+                      ) : (
+                        <span className="text-slate-500 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                      {onDeleteTransaction && t.id ? (
                         <button
                           onClick={() => {
-                            if (confirm('האם אתה בטוח שברצונך למחוק את העסקה הזו?')) {
+                            if (confirm('Are you sure you want to delete this transaction?')) {
                               onDeleteTransaction(t.id);
                             }
                           }}
                           className="text-red-400 hover:text-red-300 transition-colors"
-                          title="מחק עסקה"
+                          title="Delete transaction"
                         >
                           <Trash2 size={16} />
                         </button>
-                      </td>
-                    )}
+                      ) : (
+                        <span className="text-slate-500 text-xs">-</span>
+                      )}
+                    </td>
                   </>
                 )}
-                <td className="px-3 py-3 md:px-4 md:py-4 text-cyan-200 font-medium text-sm md:text-base" title={t.partnerName || 'לא ידוע'}>
+                <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                  {onUpdatePaymentStatus && userRole === 'boss' ? (
+                    <input
+                      type="checkbox"
+                      checked={t.isPaidToPartner || false}
+                      onChange={(e) => {
+                        if (t.id) {
+                          onUpdatePaymentStatus(t.id, e.target.checked);
+                        }
+                      }}
+                      className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-2 cursor-pointer"
+                      title="Mark as paid to partner"
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={t.isPaidToPartner || false}
+                      disabled
+                      className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-emerald-500 cursor-not-allowed opacity-50"
+                      title={t.isPaidToPartner ? "Paid" : "Not paid"}
+                    />
+                  )}
+                </td>
+                <td className="px-3 py-3 md:px-4 md:py-4 text-cyan-200 font-medium text-sm md:text-base" title={t.partnerName || 'Unknown'}>
                   <div className="flex flex-col">
-                    <span className="text-cyan-300/70 text-xs mb-1 truncate">{t.partnerName || 'לא ידוע'}</span>
+                    <span className="text-cyan-300/70 text-xs mb-1 truncate">{t.partnerName || 'Unknown'}</span>
                     <span className="text-sm md:text-base font-semibold">{formatMoney(t.eliShare)}</span>
                   </div>
                 </td>
-                <td className="px-3 py-3 md:px-4 md:py-4 text-indigo-200 font-medium text-sm md:text-base" title={t.bossName || bossName}>
+                <td className="px-3 py-3 md:px-4 md:py-4 text-indigo-200 font-medium text-sm md:text-base" title={t.bossName || ecobrothersName}>
                   <div className="flex flex-col">
-                    <span className="text-indigo-300/70 text-xs mb-1 truncate">{t.bossName || bossName}</span>
-                    <span className="text-sm md:text-base font-semibold">{formatMoney(t.shimonShare)}</span>
+                    <span className="text-indigo-300/70 text-xs mb-1 truncate">{t.bossName || ecobrothersName}</span>
+                    <span className="text-sm md:text-base font-semibold">{formatMoney(t.ecobrothersShare)}</span>
                   </div>
                 </td>
               </tr>
@@ -473,11 +499,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
           className="text-red-400/70 hover:text-red-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-full transition-all"
         >
           <Trash2 size={16} />
-          נקה היסטוריית פעולות
+          Clear Activity History
         </button>
       </div>
 
-      {/* Modal להצגת פרטי עסקה */}
+      {/* Modal for displaying transaction details */}
       {selectedTransactionForDetails && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedTransactionForDetails(null)}>
           <div className="bg-slate-900 rounded-2xl border border-white/10 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -485,7 +511,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                   <Info className="w-6 h-6 text-cyan-400" />
-                  פרטי עסקה
+                  Transaction Details
                 </h2>
                 <button
                   onClick={() => setSelectedTransactionForDetails(null)}
@@ -496,68 +522,68 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
               </div>
             </div>
             <div className="p-6 space-y-6">
-              {/* מידע בסיסי */}
+              {/* Basic information */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-800/50 rounded-xl p-4 border border-white/5">
-                  <p className="text-slate-400 text-sm mb-1">לקוח</p>
+                  <p className="text-slate-400 text-sm mb-1">Client</p>
                   <p className="text-white text-lg font-semibold">{selectedTransactionForDetails.customerName}</p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-4 border border-white/5">
-                  <p className="text-slate-400 text-sm mb-1">תאריך</p>
+                  <p className="text-slate-400 text-sm mb-1">Date</p>
                   <p className="text-white text-lg font-semibold">{selectedTransactionForDetails.date}</p>
                 </div>
               </div>
 
-              {/* שותף ובוס */}
+              {/* Partner and EcoBrothers */}
               {userRole === 'boss' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-purple-900/20 rounded-xl p-4 border border-purple-500/20">
                     <p className="text-purple-300 text-sm mb-1 flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      שותף
+                      Partner
                     </p>
-                    <p className="text-white text-lg font-semibold">{selectedTransactionForDetails.partnerName || 'לא ידוע'}</p>
+                    <p className="text-white text-lg font-semibold">{selectedTransactionForDetails.partnerName || 'Unknown'}</p>
                   </div>
                   <div className="bg-yellow-900/20 rounded-xl p-4 border border-yellow-500/20">
                     <p className="text-yellow-300 text-sm mb-1 flex items-center gap-2">
                       <Crown className="w-4 h-4" />
-                      בוס
+                      EcoBrothers
                     </p>
-                    <p className="text-white text-lg font-semibold">{selectedTransactionForDetails.bossName || bossName}</p>
+                    <p className="text-white text-lg font-semibold">{selectedTransactionForDetails.bossName || ecobrothersName}</p>
                   </div>
                 </div>
               )}
 
-              {/* סכומים */}
+              {/* Amounts */}
               <div className="bg-slate-800/50 rounded-xl p-6 border border-white/5">
                 <h3 className="text-slate-300 text-lg font-semibold mb-4 flex items-center gap-2">
                   <DollarSign className="w-5 h-5 text-cyan-400" />
-                  סכומים
+                  Amounts
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">הכנסה כוללת:</span>
+                    <span className="text-slate-400">Total Revenue:</span>
                     <span className="text-white text-lg font-semibold">{formatMoney(selectedTransactionForDetails.totalRevenue)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">הוצאות כוללות:</span>
+                    <span className="text-slate-400">Total Expenses:</span>
                     <span className="text-red-400 text-lg font-semibold">-{formatMoney(selectedTransactionForDetails.totalExpenses)}</span>
                   </div>
                   <div className="border-t border-white/10 pt-3 mt-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-300 font-semibold">רווח נקי:</span>
+                      <span className="text-slate-300 font-semibold">Net Profit:</span>
                       <span className="text-emerald-400 text-xl font-bold">{formatMoney(selectedTransactionForDetails.netProfit)}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* הוצאות מפורטות */}
+              {/* Detailed expenses */}
               {selectedTransactionForDetails.expenses && selectedTransactionForDetails.expenses.length > 0 ? (
                 <div className="bg-slate-800/50 rounded-xl p-6 border border-white/5">
                   <h3 className="text-slate-300 text-lg font-semibold mb-4 flex items-center gap-2">
                     <Receipt className="w-5 h-5 text-red-400" />
-                    הוצאות מפורטות
+                    Detailed Expenses
                   </h3>
                   <div className="space-y-2">
                     {selectedTransactionForDetails.expenses.map((expense: Expense, index: number) => (
@@ -568,7 +594,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                     ))}
                     <div className="border-t border-white/10 pt-3 mt-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-300 font-semibold">סה"כ הוצאות:</span>
+                        <span className="text-slate-300 font-semibold">Total Expenses:</span>
                         <span className="text-red-400 text-lg font-bold">{formatMoney(selectedTransactionForDetails.totalExpenses)}</span>
                       </div>
                     </div>
@@ -578,33 +604,33 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                 <div className="bg-slate-800/50 rounded-xl p-6 border border-white/5">
                   <h3 className="text-slate-300 text-lg font-semibold mb-2 flex items-center gap-2">
                     <Receipt className="w-5 h-5 text-red-400" />
-                    הוצאות
+                    Expenses
                   </h3>
-                  <p className="text-slate-400 text-sm">אין פירוט הוצאות זמין עבור עסקה זו</p>
-                  <p className="text-slate-500 text-xs mt-2">סה"כ הוצאות: {formatMoney(selectedTransactionForDetails.totalExpenses)}</p>
+                  <p className="text-slate-400 text-sm">No expense details available for this transaction</p>
+                  <p className="text-slate-500 text-xs mt-2">Total Expenses: {formatMoney(selectedTransactionForDetails.totalExpenses)}</p>
                 </div>
               )}
 
-              {/* חלוקה */}
+              {/* Split */}
               <div className="bg-slate-800/50 rounded-xl p-6 border border-white/5">
                 <h3 className="text-slate-300 text-lg font-semibold mb-4 flex items-center gap-2">
                   <Percent className="w-5 h-5 text-indigo-400" />
-                  חלוקה
+                  Split
                 </h3>
                 <div className="space-y-4">
                   <div className="bg-cyan-900/20 rounded-xl p-4 border border-cyan-500/20">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-cyan-300 font-medium">{selectedTransactionForDetails.partnerName || 'שותף'}</span>
+                      <span className="text-cyan-300 font-medium">{selectedTransactionForDetails.partnerName || 'Partner'}</span>
                       <span className="text-cyan-300 text-sm">{selectedTransactionForDetails.eliPercentage}%</span>
                     </div>
                     <p className="text-white text-2xl font-bold">{formatMoney(selectedTransactionForDetails.eliShare)}</p>
                   </div>
                   <div className="bg-indigo-900/20 rounded-xl p-4 border border-indigo-500/20">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-indigo-300 font-medium">{selectedTransactionForDetails.bossName || bossName}</span>
-                      <span className="text-indigo-300 text-sm">{selectedTransactionForDetails.shimonPercentage}%</span>
+                      <span className="text-indigo-300 font-medium">{selectedTransactionForDetails.bossName || ecobrothersName}</span>
+                      <span className="text-indigo-300 text-sm">{selectedTransactionForDetails.ecobrothersPercentage}%</span>
                     </div>
-                    <p className="text-white text-2xl font-bold">{formatMoney(selectedTransactionForDetails.shimonShare)}</p>
+                    <p className="text-white text-2xl font-bold">{formatMoney(selectedTransactionForDetails.ecobrothersShare)}</p>
                   </div>
                 </div>
               </div>

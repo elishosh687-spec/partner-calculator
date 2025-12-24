@@ -27,16 +27,16 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<TransactionResult[]>([]);
   const [editingTransaction, setEditingTransaction] = useState<TransactionResult | null>(null);
 
-  // טעינת עסקאות מ-Firebase + Realtime Listener
+  // Load transactions from Firebase + Realtime Listener
   useEffect(() => {
     if (!currentUser || !userData) {
       setTransactions([]);
       return;
     }
 
-    console.log('📥 מתחבר ל-Firebase...', userData.role);
+    console.log('📥 Connecting to Firebase...', userData.role);
     
-    // יצירת Query - אם בוס רואה הכל, שותף רק את שלו
+    // Create Query - if boss sees all, partner only sees their own
     const baseQuery = collection(db, 'transactions');
     const q = userData.role === 'boss'
       ? query(baseQuery, orderBy('createdAt', 'desc'))
@@ -46,7 +46,7 @@ const App: React.FC = () => {
           orderBy('createdAt', 'desc')
         );
 
-    // האזנה לשינויים בזמן אמת
+    // Listen to real-time changes
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
         const loadedTransactions: TransactionResult[] = [];
@@ -64,52 +64,53 @@ const App: React.FC = () => {
             totalExpenses: data.totalExpenses,
             netProfit: data.netProfit,
             eliShare: data.eliShare,
-            shimonShare: data.shimonShare,
+            ecobrothersShare: data.ecobrothersShare || data.shimonShare || 0, // Support legacy data
             eliPercentage: data.eliPercentage,
-            shimonPercentage: data.shimonPercentage,
-            expenses: data.expenses || [], // טעינת רשימת ההוצאות המפורטת
+            ecobrothersPercentage: data.ecobrothersPercentage || data.shimonPercentage || 0, // Support legacy data
+            expenses: data.expenses || [], // Load detailed expenses list
+            isPaidToPartner: data.isPaidToPartner || false,
           });
         });
-        console.log('✅ טעינתי עסקאות מ-Firebase:', loadedTransactions.length);
+        console.log('✅ Loaded transactions from Firebase:', loadedTransactions.length);
         setTransactions(loadedTransactions);
       },
       (error) => {
-        console.error('❌ שגיאה בטעינת עסקאות מ-Firebase:', error);
+        console.error('❌ Error loading transactions from Firebase:', error);
       }
     );
 
-    // ניקוי - ביטול מנוי כאשר הקומפוננטה נסגרת
+    // Cleanup - unsubscribe when component unmounts
     return () => {
-      console.log('🔌 מנתק חיבור מ-Firebase...');
+      console.log('🔌 Disconnecting from Firebase...');
       unsubscribe();
     };
   }, [currentUser, userData]);
 
   const handleSaveTransaction = async (transaction: TransactionResult) => {
     if (!currentUser || !userData) {
-      alert('עליך להתחבר כדי לשמור עסקה');
+      alert('You must be logged in to save a transaction');
       return;
     }
 
     try {
-      // אם יש id, זה עדכון של עסקה קיימת
+      // If there's an id, this is an update to an existing transaction
       if (transaction.id) {
-        console.log('✏️ מעדכן עסקה קיימת ב-Firebase...', transaction);
+        console.log('✏️ Updating existing transaction in Firebase...', transaction);
         
         const { id, ...updateData } = transaction;
         await updateDoc(doc(db, 'transactions', id), {
           ...updateData,
-          // לא מעדכן createdAt - שומר את התאריך המקורי
+          // Don't update createdAt - keep the original date
         });
         
-        console.log('✅ עסקה עודכנה בהצלחה ב-Firebase');
-        setEditingTransaction(null); // סיום מצב עריכה
+        console.log('✅ Transaction updated successfully in Firebase');
+        setEditingTransaction(null); // End edit mode
         return;
       }
 
-      // אחרת, זה עסקה חדשה
-      console.log('💾 שומר עסקה חדשה ב-Firebase...', transaction);
-      console.log('📋 פרטי העסקה:', {
+      // Otherwise, this is a new transaction
+      console.log('💾 Saving new transaction to Firebase...', transaction);
+      console.log('📋 Transaction details:', {
         partnerId: transaction.partnerId,
         partnerName: transaction.partnerName,
         customerName: transaction.customerName,
@@ -122,45 +123,45 @@ const App: React.FC = () => {
           transaction.totalExpenses !== undefined &&
           transaction.netProfit !== undefined &&
           transaction.eliShare !== undefined &&
-          transaction.shimonShare !== undefined &&
+          transaction.ecobrothersShare !== undefined &&
           transaction.eliPercentage !== undefined &&
-          transaction.shimonPercentage !== undefined
+          transaction.ecobrothersPercentage !== undefined
         )
       });
       
-      // אם העסקה כבר מכילה partnerId ו-partnerName (מהשותף שנבחר), נשתמש בהם
-      // אחרת, נשתמש בערכי המשתמש הנוכחי (רק למקרה של שותף שיוצר עסקה לעצמו)
+      // If the transaction already contains partnerId and partnerName (from selected partner), use them
+      // Otherwise, use current user values (only for partner creating transaction for themselves)
       const transactionData = {
         ...transaction,
-        // partnerId ו-partnerName כבר קיימים ב-transaction מהשותף שנבחר ב-Calculator
-        // לא משכתבים אותם כדי שהבוס לא יופיע כשותף בטבלה
+        // partnerId and partnerName already exist in transaction from partner selected in Calculator
+        // Don't overwrite them so boss doesn't appear as partner in table
         createdAt: Timestamp.now()
       };
       
-      console.log('📤 שולח ל-Firebase:', transactionData);
+      console.log('📤 Sending to Firebase:', transactionData);
       
       await addDoc(collection(db, 'transactions'), transactionData);
       
-      console.log('✅ עסקה נשמרה בהצלחה ב-Firebase');
+      console.log('✅ Transaction saved successfully to Firebase');
     } catch (error: any) {
-      console.error('❌ שגיאה בשמירת עסקה:', error);
-      console.error('❌ פרטי השגיאה:', {
+      console.error('❌ Error saving transaction:', error);
+      console.error('❌ Error details:', {
         code: error.code,
         message: error.message,
         stack: error.stack
       });
-      alert(`שגיאה בשמירת העסקה: ${error.message || 'בדוק את החיבור ל-Firebase'}`);
+      alert(`Error saving transaction: ${error.message || 'Check Firebase connection'}`);
     }
   };
 
   const handleUpdateTransaction = async (transactionId: string, newPartnerId: string, newPartnerName: string, newBossId?: string, newBossName?: string) => {
     if (!currentUser || !userData || userData.role !== 'boss') {
-      alert('רק המנהל יכול לעדכן עסקאות');
+      alert('Only the manager can update transactions');
       return;
     }
 
     try {
-      console.log('✏️ מעדכן עסקה ב-Firebase...', { transactionId, newPartnerId, newPartnerName, newBossId, newBossName });
+      console.log('✏️ Updating transaction in Firebase...', { transactionId, newPartnerId, newPartnerName, newBossId, newBossName });
       
       const updateData: any = {
         partnerId: newPartnerId,
@@ -174,16 +175,37 @@ const App: React.FC = () => {
       
       await updateDoc(doc(db, 'transactions', transactionId), updateData);
       
-      console.log('✅ עסקה עודכנה בהצלחה ב-Firebase');
-      // העדכון יתעדכן אוטומטית דרך onSnapshot
+      console.log('✅ Transaction updated successfully in Firebase');
+      // Update will be reflected automatically via onSnapshot
     } catch (error: any) {
-      console.error('❌ שגיאה בעדכון עסקה:', error);
-      console.error('❌ פרטי השגיאה:', {
+      console.error('❌ Error updating transaction:', error);
+      console.error('❌ Error details:', {
         code: error.code,
         message: error.message,
         stack: error.stack
       });
-      alert(`שגיאה בעדכון העסקה: ${error.message || 'בדוק את החיבור ל-Firebase'}`);
+      alert(`Error updating transaction: ${error.message || 'Check Firebase connection'}`);
+    }
+  };
+
+  const handleUpdatePaymentStatus = async (transactionId: string, isPaid: boolean) => {
+    if (!currentUser || !userData || userData.role !== 'boss') {
+      alert('Only the manager can update payment status');
+      return;
+    }
+
+    try {
+      console.log('✏️ Updating payment status in Firebase...', { transactionId, isPaid });
+      
+      await updateDoc(doc(db, 'transactions', transactionId), {
+        isPaidToPartner: isPaid
+      });
+      
+      console.log('✅ Payment status updated successfully in Firebase');
+      // Update will be reflected automatically via onSnapshot
+    } catch (error: any) {
+      console.error('❌ Error updating payment status:', error);
+      alert(`Error updating payment status: ${error.message || 'Check Firebase connection'}`);
     }
   };
 
@@ -191,12 +213,12 @@ const App: React.FC = () => {
     if (!currentUser || !userData) return;
 
     try {
-      console.log('🗑️ מוחק עסקה מ-Firebase...', transactionId);
+      console.log('🗑️ Deleting transaction from Firebase...', transactionId);
       await deleteDoc(doc(db, 'transactions', transactionId));
-      console.log('✅ עסקה נמחקה מ-Firebase');
+      console.log('✅ Transaction deleted from Firebase');
     } catch (error: any) {
-      console.error('❌ שגיאה במחיקת עסקה:', error);
-      alert(`שגיאה במחיקת העסקה: ${error.message || 'נסה שוב'}`);
+      console.error('❌ Error deleting transaction:', error);
+      alert(`Error deleting transaction: ${error.message || 'Try again'}`);
     }
   };
 
@@ -213,7 +235,7 @@ const App: React.FC = () => {
     if (!currentUser || !userData || !editingTransaction?.id) return;
 
     try {
-      console.log('✏️ מעדכן עסקה מלא ב-Firebase...', transaction);
+      console.log('✏️ Updating full transaction in Firebase...', transaction);
       
       await updateDoc(doc(db, 'transactions', editingTransaction.id), {
         partnerId: transaction.partnerId,
@@ -224,16 +246,17 @@ const App: React.FC = () => {
         totalExpenses: transaction.totalExpenses,
         netProfit: transaction.netProfit,
         eliShare: transaction.eliShare,
-        shimonShare: transaction.shimonShare,
+        ecobrothersShare: transaction.ecobrothersShare,
         eliPercentage: transaction.eliPercentage,
-        shimonPercentage: transaction.shimonPercentage,
+        ecobrothersPercentage: transaction.ecobrothersPercentage,
+        isPaidToPartner: transaction.isPaidToPartner || false,
       });
       
-      console.log('✅ עסקה עודכנה בהצלחה ב-Firebase');
+      console.log('✅ Transaction updated successfully in Firebase');
       setEditingTransaction(null);
     } catch (error: any) {
-      console.error('❌ שגיאה בעדכון עסקה:', error);
-      alert(`שגיאה בעדכון העסקה: ${error.message || 'בדוק את החיבור ל-Firebase'}`);
+      console.error('❌ Error updating transaction:', error);
+      alert(`Error updating transaction: ${error.message || 'Check Firebase connection'}`);
     }
   };
 
@@ -241,14 +264,14 @@ const App: React.FC = () => {
     if (!currentUser || !userData) return;
 
     const confirmMessage = userData.role === 'boss'
-      ? 'האם אתה בטוח שברצונך למחוק את כל ההיסטוריה של כל השותפים?'
-      : 'האם אתה בטוח שברצונך למחוק את כל ההיסטוריה שלך?';
+      ? 'Are you sure you want to delete all history for all partners?'
+      : 'Are you sure you want to delete all your history?';
 
     if (confirm(confirmMessage)) {
       try {
-        console.log('🗑️ מוחק עסקאות מ-Firebase...');
+        console.log('🗑️ Deleting transactions from Firebase...');
         
-        // אם שותף - מחיקה רק של העסקאות שלו
+        // If partner - delete only their transactions
         const baseQuery = collection(db, 'transactions');
         const q = userData.role === 'boss'
           ? baseQuery
@@ -258,15 +281,15 @@ const App: React.FC = () => {
         const deletePromises = querySnapshot.docs.map((doc) => deleteDoc(doc.ref));
         await Promise.all(deletePromises);
         
-        console.log('✅ העסקאות נמחקו מ-Firebase');
+        console.log('✅ Transactions deleted from Firebase');
       } catch (error) {
-        console.error('❌ שגיאה במחיקת עסקאות:', error);
-        alert('שגיאה במחיקת ההיסטוריה. נסה שוב.');
+        console.error('❌ Error deleting transactions:', error);
+        alert('Error deleting history. Try again.');
       }
     }
   };
 
-  // אם המשתמש לא מחובר - הצג דף התחברות
+  // If user is not logged in - show login page
   if (!currentUser || !userData) {
     return <Login />;
   }
@@ -297,8 +320,8 @@ const App: React.FC = () => {
                     <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border border-white/5">
                       <span className="text-3xl">🔒</span>
                     </div>
-                    <p className="text-base sm:text-lg text-slate-300 font-medium">רק המנהל יכול להזין עסקאות</p>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-2">פנה למנהל להזנת עסקה חדשה</p>
+                    <p className="text-base sm:text-lg text-slate-300 font-medium">Only the manager can enter transactions</p>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-2">Contact the manager to enter a new transaction</p>
                   </div>
                 )
               ) : (
@@ -308,6 +331,7 @@ const App: React.FC = () => {
                   onUpdateTransaction={userData.role === 'boss' ? handleUpdateTransaction : undefined}
                   onDeleteTransaction={handleDeleteTransaction}
                   onEditTransaction={userData.role === 'boss' ? handleEditTransaction : undefined}
+                  onUpdatePaymentStatus={userData.role === 'boss' ? handleUpdatePaymentStatus : undefined}
                   userRole={userData.role}
                 />
               )}

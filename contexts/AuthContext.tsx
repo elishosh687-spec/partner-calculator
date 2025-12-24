@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUserData(null);
           }
         } catch (error) {
-          console.error('❌ שגיאה בטעינת נתוני משתמש:', error);
+          console.error('❌ Error loading user data:', error);
           setUserData(null);
         }
       } else {
@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // אם המשתמש לא קיים - צור אותו
     if (!userDoc.exists()) {
       await setDoc(userDocRef, {
-        name: user.displayName || user.email?.split('@')[0] || 'משתמש',
+        name: user.displayName || user.email?.split('@')[0] || 'User',
         email: user.email,
         role,
         createdAt: new Date(),
@@ -109,11 +109,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserName = async (newName: string) => {
     if (!currentUser) {
-      throw new Error('משתמש לא מחובר');
+      throw new Error('User not logged in');
     }
     
     if (!newName || newName.trim().length === 0) {
-      throw new Error('שם לא יכול להיות ריק');
+      throw new Error('Name cannot be empty');
     }
     
     const userDocRef = doc(db, 'users', currentUser.uid);

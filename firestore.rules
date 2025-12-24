@@ -41,9 +41,11 @@ service cloud.firestore {
       allow read: if isSignedIn() && 
                      (isBoss() || resource.data.partnerId == request.auth.uid);
       
-      // יצירה: רק משתמש מחובר, וה-partnerId חייב להיות שלו
+      // יצירה: 
+      // - בוס יכול ליצור עסקה עבור כל שותף (partnerId יכול להיות של מישהו אחר)
+      // - שותף יכול ליצור עסקה רק לעצמו (partnerId חייב להיות שלו)
       allow create: if isSignedIn() && 
-                       request.resource.data.partnerId == request.auth.uid &&
+                       (isBoss() || request.resource.data.partnerId == request.auth.uid) &&
                        request.resource.data.keys().hasAll([
                          'partnerId', 
                          'partnerName',
@@ -57,12 +59,18 @@ service cloud.firestore {
                          'eliPercentage',
                          'shimonPercentage',
                          'createdAt'
-                       ]);
+                       ]) &&
+                       // bossId ו-bossName הם אופציונליים (לתמיכה בעסקאות ישנות)
+                       (!request.resource.data.keys().hasAny(['bossId']) || 
+                        request.resource.data.keys().hasAll(['bossId', 'bossName']));
       
-      // עדכון: רק בעל העסקה (לא יכול לשנות partnerId)
+      // עדכון: 
+      // - בוס יכול לעדכן כל עסקה ולשנות partnerId/partnerName (לתיקון נתונים ישנים)
+      // - בעל העסקה יכול לעדכן את העסקה שלו (אבל לא יכול לשנות partnerId)
       allow update: if isSignedIn() && 
-                       resource.data.partnerId == request.auth.uid &&
-                       request.resource.data.partnerId == resource.data.partnerId;
+                       (isBoss() || 
+                        (resource.data.partnerId == request.auth.uid && 
+                         request.resource.data.partnerId == resource.data.partnerId));
       
       // מחיקה: בעל העסקה או בוס
       allow delete: if isSignedIn() && 

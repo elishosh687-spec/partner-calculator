@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     return {
       base: '/', // Firebase Hosting - always use root path
       server: {
-        port: 3000,
+        port: 5173,
         host: '0.0.0.0',
       },
       plugins: [react()],

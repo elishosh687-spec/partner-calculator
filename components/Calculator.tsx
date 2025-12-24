@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User, Users } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Save, Calculator as CalcIcon, Wallet, Calendar, User, Users, X, Crown } from 'lucide-react';
 import { Expense, TransactionResult } from '../types';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CalculatorProps {
   onSave: (transaction: TransactionResult) => void;
   currentUserId: string;
+  editingTransaction?: TransactionResult | null;
+  onCancelEdit?: () => void;
 }
 
 interface Partner {
@@ -14,11 +17,28 @@ interface Partner {
   name: string;
 }
 
-const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
+interface Boss {
+  id: string;
+  name: string;
+}
+
+const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId, editingTransaction, onCancelEdit }) => {
+  const { userData } = useAuth();
+  
+  // Helper to get boss name
+  const getBossName = () => {
+    return bosses.find(b => b.id === selectedBossId)?.name || 'בוס';
+  };
+  
   // Partners list
   const [partners, setPartners] = useState<Partner[]>([]);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
   const [loadingPartners, setLoadingPartners] = useState(true);
+  
+  // Bosses list
+  const [bosses, setBosses] = useState<Boss[]>([]);
+  const [selectedBossId, setSelectedBossId] = useState<string>('');
+  const [loadingBosses, setLoadingBosses] = useState(true);
 
   // Form State
   const [customerName, setCustomerName] = useState('');
@@ -37,6 +57,72 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
 
   // Result State
   const [result, setResult] = useState<TransactionResult | null>(null);
+
+  // טעינת נתוני עסקה לעריכה
+  useEffect(() => {
+    if (editingTransaction) {
+      setCustomerName(editingTransaction.customerName);
+      setTotalRevenue(editingTransaction.totalRevenue.toString());
+      setDate(editingTransaction.date);
+      setEliPercent(editingTransaction.eliPercentage);
+      setShimonPercent(editingTransaction.shimonPercentage);
+      
+      // טעינת הוצאות אם יש
+      if (editingTransaction.expenses && editingTransaction.expenses.length > 0) {
+        setExpenses(editingTransaction.expenses);
+      } else {
+        setExpenses([]);
+      }
+      
+      // בדיקה אם השותף המקורי קיים ברשימה
+      const originalPartnerExists = partners.some(p => p.id === editingTransaction.partnerId);
+      if (originalPartnerExists) {
+        setSelectedPartnerId(editingTransaction.partnerId);
+      } else {
+        // אם השותף המקורי לא נמצא, בוחרים את השותף הראשון מהרשימה
+        if (partners.length > 0) {
+          console.warn(`⚠️ השותף המקורי (${editingTransaction.partnerId}) לא נמצא ברשימה. בוחר שותף חדש: ${partners[0].name}`);
+          setSelectedPartnerId(partners[0].id);
+        } else {
+          console.warn('⚠️ אין שותפים זמינים');
+          setSelectedPartnerId('');
+        }
+      }
+      
+      // בדיקה אם הבוס המקורי קיים ברשימה
+      if (editingTransaction.bossId) {
+        const originalBossExists = bosses.some(b => b.id === editingTransaction.bossId);
+        if (originalBossExists) {
+          setSelectedBossId(editingTransaction.bossId);
+        } else {
+          // אם הבוס המקורי לא נמצא, בוחרים את הבוס הראשון מהרשימה
+          if (bosses.length > 0) {
+            console.warn(`⚠️ הבוס המקורי (${editingTransaction.bossId}) לא נמצא ברשימה. בוחר בוס חדש: ${bosses[0].name}`);
+            setSelectedBossId(bosses[0].id);
+          } else {
+            console.warn('⚠️ אין בוסים זמינים');
+            setSelectedBossId('');
+          }
+        }
+      } else if (bosses.length > 0) {
+        // אם אין bossId בעסקה הישנה, בוחרים את הבוס הראשון
+        setSelectedBossId(bosses[0].id);
+      }
+      
+      // חישוב מחדש כדי להציג את התוצאה
+      const revenue = editingTransaction.totalRevenue;
+      const net = revenue - editingTransaction.totalExpenses;
+      setResult({
+        ...editingTransaction,
+        netProfit: net,
+        eliShare: net * (editingTransaction.eliPercentage / 100),
+        shimonShare: net * (editingTransaction.shimonPercentage / 100),
+      });
+    } else {
+      // אם אין editingTransaction, איפוס ההוצאות
+      setExpenses([]);
+    }
+  }, [editingTransaction, partners, bosses]);
 
   // Load partners from Firestore
   useEffect(() => {
@@ -66,7 +152,37 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
     };
 
     loadPartners();
-  }, []);
+  }, [editingTransaction]);
+
+  // Load bosses from Firestore
+  useEffect(() => {
+    const loadBosses = async () => {
+      try {
+        const q = query(collection(db, 'users'), where('role', '==', 'boss'));
+        const querySnapshot = await getDocs(q);
+        const bossesList: Boss[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          bossesList.push({
+            id: doc.id,
+            name: data.name,
+          });
+        });
+        
+        setBosses(bossesList);
+        if (bossesList.length > 0 && !editingTransaction) {
+          setSelectedBossId(bossesList[0].id);
+        }
+      } catch (error) {
+        console.error('❌ שגיאה בטעינת בוסים:', error);
+      } finally {
+        setLoadingBosses(false);
+      }
+    };
+
+    loadBosses();
+  }, [editingTransaction]);
 
   // Calculate percentages dynamically
   const handleEliChange = (val: string) => {
@@ -108,13 +224,23 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
       return;
     }
 
+    if (!selectedBossId) {
+      alert('אנא בחר בוס');
+      return;
+    }
+
     const revenue = parseFloat(totalRevenue) || 0;
     const net = revenue - totalExpenses;
     const selectedPartner = partners.find(p => p.id === selectedPartnerId);
+    const selectedBoss = bosses.find(b => b.id === selectedBossId);
     
     const res: TransactionResult = {
+      // שמירת id אם זה עריכה
+      ...(editingTransaction?.id && { id: editingTransaction.id }),
       partnerId: selectedPartnerId,
       partnerName: selectedPartner?.name || 'שותף',
+      bossId: selectedBossId,
+      bossName: selectedBoss?.name || 'בוס',
       customerName: customerName || 'לקוח מזדמן',
       date,
       totalRevenue: revenue,
@@ -124,6 +250,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
       shimonPercentage: shimonPercent,
       eliShare: net * (eliPercent / 100),
       shimonShare: net * (shimonPercent / 100),
+      expenses: expenses, // שמירת רשימת ההוצאות המפורטת
     };
 
     setResult(res);
@@ -141,12 +268,21 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
     if (partners.length > 0) {
       setSelectedPartnerId(partners[0].id);
     }
+    if (bosses.length > 0) {
+      setSelectedBossId(bosses[0].id);
+    }
+    // אם יש editingTransaction, נבטל את מצב העריכה
+    if (editingTransaction && onCancelEdit) {
+      onCancelEdit();
+    }
   };
 
   const handleSave = () => {
     if (result) {
       onSave(result);
-      handleReset();
+      if (!editingTransaction) {
+        handleReset();
+      }
     }
   };
 
@@ -155,11 +291,11 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   };
 
-  if (loadingPartners) {
+  if (loadingPartners || loadingBosses) {
     return (
       <div className="text-center py-12">
         <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto"></div>
-        <p className="text-slate-400 mt-4">טוען שותפים...</p>
+        <p className="text-slate-400 mt-4">טוען נתונים...</p>
       </div>
     );
   }
@@ -176,8 +312,20 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
     );
   }
 
+  if (bosses.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-14 h-14 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+          <Users className="text-slate-600" size={28} />
+        </div>
+        <p className="text-base text-slate-300 font-medium">אין בוסים במערכת</p>
+        <p className="text-xs text-slate-500 mt-2">צריך להוסיף בוסים כדי ליצור עסקאות</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5 sm:space-y-6 md:space-y-8">
+    <div className="space-y-4 sm:space-y-5 md:space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
       {/* Partner Selection */}
       <div className="bg-gradient-to-r from-purple-500/10 to-cyan-500/10 p-4 sm:p-5 rounded-2xl border border-white/10">
         <label className="block text-slate-300 text-sm font-bold mb-3 flex items-center gap-2">
@@ -266,7 +414,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
             </div>
             <div className="flex-1 bg-black/40 rounded-xl p-3 sm:p-4 border border-white/5 relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500/50"></div>
-               <label className="block text-indigo-400 text-[10px] sm:text-xs mb-1 font-bold">שמעון</label>
+               <label className="block text-indigo-400 text-[10px] sm:text-xs mb-1 font-bold">{bosses.find(b => b.id === selectedBossId)?.name || 'בוס'}</label>
                <div className="flex items-baseline gap-1">
                  <input
                   type="number"
@@ -378,7 +526,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
                 </div>
                 <div className="w-px bg-slate-800"></div>
                 <div className="flex-1 p-3 sm:p-4 md:p-5 text-center bg-gradient-to-b from-indigo-500/5 to-transparent">
-                    <p className="text-indigo-400 text-[10px] sm:text-xs font-bold uppercase mb-1">חלקו של שמעון</p>
+                    <p className="text-indigo-400 text-[10px] sm:text-xs font-bold uppercase mb-1">חלקו של {getBossName()}</p>
                     <p className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-lg">{formatMoney(result.shimonShare)}</p>
                     <p className="text-slate-500 text-[9px] sm:text-[10px] mt-1">{result.shimonPercentage}%</p>
                 </div>
@@ -400,13 +548,23 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
 
       {/* Footer Actions */}
       <div className="flex gap-3 sm:gap-4 pt-3 sm:pt-4">
-        <button
-          onClick={handleReset}
-          className="bg-slate-800/50 hover:bg-slate-700/50 border border-white/5 text-slate-400 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-medium transition-colors flex items-center gap-2 hover:text-white"
-        >
-          <RotateCcw size={14} className="sm:w-4 sm:h-4" />
-          <span className="text-xs sm:text-sm">איפוס</span>
-        </button>
+        {editingTransaction && onCancelEdit ? (
+          <button
+            onClick={onCancelEdit}
+            className="bg-slate-800/50 hover:bg-slate-700/50 border border-white/5 text-slate-400 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-medium transition-colors flex items-center gap-2 hover:text-white"
+          >
+            <X size={14} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">בטל עריכה</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleReset}
+            className="bg-slate-800/50 hover:bg-slate-700/50 border border-white/5 text-slate-400 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-medium transition-colors flex items-center gap-2 hover:text-white"
+          >
+            <RotateCcw size={14} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">איפוס</span>
+          </button>
+        )}
         <button
           onClick={handleSave}
           disabled={!result}
@@ -417,7 +575,7 @@ const Calculator: React.FC<CalculatorProps> = ({ onSave, currentUserId }) => {
           }`}
         >
           <Save size={16} className="sm:w-[18px] sm:h-[18px]" />
-          שמור לעסקאות
+          {editingTransaction ? 'עדכן עסקה' : 'שמור לעסקאות'}
         </button>
       </div>
     </div>

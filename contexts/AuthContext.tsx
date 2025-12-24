@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { UserData } from '../types';
 
@@ -12,6 +12,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   signup: (email: string, password: string, name: string, role: 'partner' | 'boss') => Promise<void>;
   signInWithGoogle: (role: 'partner' | 'boss') => Promise<void>;
+  updateUserName: (newName: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -106,6 +107,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserName = async (newName: string) => {
+    if (!currentUser) {
+      throw new Error('משתמש לא מחובר');
+    }
+    
+    if (!newName || newName.trim().length === 0) {
+      throw new Error('שם לא יכול להיות ריק');
+    }
+    
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    await updateDoc(userDocRef, {
+      name: newName.trim()
+    });
+    
+    // עדכון userData מקומי
+    if (userData) {
+      setUserData({
+        ...userData,
+        name: newName.trim()
+      });
+    }
+  };
+
   const value: AuthContextType = {
     currentUser,
     userData,
@@ -114,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     signup,
     signInWithGoogle,
+    updateUserName,
   };
 
   return (

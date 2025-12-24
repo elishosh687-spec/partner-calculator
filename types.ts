@@ -8,6 +8,8 @@ export interface TransactionResult {
   id?: string; // Firebase document ID
   partnerId: string; // 🆕 ID של השותף שיצר את העסקה
   partnerName?: string; // 🆕 שם השותף (לתצוגה)
+  bossId?: string; // 🆕 ID של הבוס בעסקה
+  bossName?: string; // 🆕 שם הבוס (לתצוגה)
   customerName: string;
   date: string;
   totalRevenue: number;
@@ -17,6 +19,7 @@ export interface TransactionResult {
   shimonShare: number;
   eliPercentage: number;
   shimonPercentage: number;
+  expenses?: Expense[]; // רשימת הוצאות מפורטת
 }
 
 export interface UserData {

@@ -319,7 +319,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                   <th className="px-3 py-3 md:px-4 md:py-4 text-red-400/80 whitespace-nowrap">Delete</th>
                 </>
               )}
-              <th className="px-3 py-3 md:px-4 md:py-4 text-emerald-400/80 whitespace-nowrap">Paid</th>
+              <th className="px-3 py-3 md:px-4 md:py-4 text-emerald-400/80 whitespace-nowrap text-center">Paid</th>
               <th className="px-3 py-3 md:px-4 md:py-4 text-cyan-400/80 whitespace-nowrap">Partner Share</th>
               <th className="px-3 py-3 md:px-4 md:py-4 text-indigo-400/80 whitespace-nowrap">EcoBrothers Share</th>
             </tr>
@@ -451,28 +451,30 @@ const HistoryView: React.FC<HistoryViewProps> = ({ transactions, onClearHistory,
                     </td>
                   </>
                 )}
-                <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
-                  {onUpdatePaymentStatus && userRole === 'boss' ? (
-                    <input
-                      type="checkbox"
-                      checked={t.isPaidToPartner || false}
-                      onChange={(e) => {
-                        if (t.id) {
-                          onUpdatePaymentStatus(t.id, e.target.checked);
-                        }
-                      }}
-                      className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-2 cursor-pointer"
-                      title="Mark as paid to partner"
-                    />
-                  ) : (
-                    <input
-                      type="checkbox"
-                      checked={t.isPaidToPartner || false}
-                      disabled
-                      className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-emerald-500 cursor-not-allowed opacity-50"
-                      title={t.isPaidToPartner ? "Paid" : "Not paid"}
-                    />
-                  )}
+                <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex justify-center items-center">
+                    {onUpdatePaymentStatus && userRole === 'boss' ? (
+                      <input
+                        type="checkbox"
+                        checked={t.isPaidToPartner || false}
+                        onChange={(e) => {
+                          if (t.id) {
+                            onUpdatePaymentStatus(t.id, e.target.checked);
+                          }
+                        }}
+                        className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-2 cursor-pointer"
+                        title="Mark as paid to partner"
+                      />
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={t.isPaidToPartner || false}
+                        disabled
+                        className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-emerald-500 cursor-not-allowed opacity-50"
+                        title={t.isPaidToPartner ? "Paid" : "Not paid"}
+                      />
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-3 md:px-4 md:py-4 text-cyan-200 font-medium text-sm md:text-base" title={t.partnerName || 'Unknown'}>
                   <div className="flex flex-col">
